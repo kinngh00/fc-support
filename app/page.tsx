@@ -350,19 +350,34 @@ function CompactSwitch({ label, checked, onChange, disabled = false, showStateTe
 function FormationPitch({ details, fallbackFormation }: { details: SquadProfileDetails; fallbackFormation: string | null }) {
   const pitchX = (value: number) => Math.max(10, Math.min(90, 50 + (value - 50) * 2.05));
   const pitchY = (value: number) => Math.max(7, Math.min(88, 6 + value * 1.2));
+  const mobilePositions = new Map<string, { left: number; bottom: number }>();
+  const mobileRows: Array<typeof details.players> = [];
+  for (const player of [...details.players].sort((left, right) => left.y - right.y || left.x - right.x)) {
+    const row = mobileRows.find((items) => Math.abs(items[0].y - player.y) <= 8);
+    if (row) row.push(player); else mobileRows.push([player]);
+  }
+  mobileRows.forEach((players, rowIndex) => {
+    const bottom = mobileRows.length === 1 ? 50 : 4 + rowIndex * (78 / (mobileRows.length - 1));
+    [...players].sort((left, right) => left.x - right.x).forEach((player, playerIndex) => {
+      const left = players.length === 1 ? 50 : 13 + playerIndex * (74 / (players.length - 1));
+      mobilePositions.set(`${player.spid}-${player.position}`, { left, bottom });
+    });
+  });
   return <div className="formation-view">
     <div className="formation-view-title"><span>FORMATION</span><b>{details.formation || fallbackFormation || "포메이션 정보 없음"}</b></div>
     <div className="formation-pitch">
       <div className="pitch-halfway" /><div className="pitch-circle" /><div className="pitch-box pitch-box-top" /><div className="pitch-box pitch-box-bottom" />
-      {details.players.map((player) => (
+      {details.players.map((player) => {
+        const mobilePosition = mobilePositions.get(`${player.spid}-${player.position}`) || { left: 50, bottom: 50 };
+        return (
         <article
           className={`formation-player position-${positionGroup(player.position)}`}
           key={`${player.spid}-${player.position}`}
           style={{
             left: `${pitchX(player.x)}%`,
             bottom: `${pitchY(player.y)}%`,
-            "--mobile-player-left": `${pitchX(player.x)}%`,
-            "--mobile-player-bottom": `${pitchY(player.y)}%`,
+            "--mobile-player-left": `${mobilePosition.left}%`,
+            "--mobile-player-bottom": `${mobilePosition.bottom}%`,
           } as CSSProperties}
         >
           <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
@@ -371,7 +386,8 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
           <div className="formation-player-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} />{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
           <div className="formation-player-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
         </article>
-      ))}
+        );
+      })}
     </div>
   </div>;
 }
