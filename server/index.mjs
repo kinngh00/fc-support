@@ -55,7 +55,8 @@ const server = http.createServer(async (request, response) => {
       const rankEnd = integer(url, "rankEnd", 10000, 1, 10000);
       if (rankStart > rankEnd) throw new Error("rankStart cannot be greater than rankEnd.");
       const teamColor = (url.searchParams.get("teamColor") || "").trim();
-      const result = listAvailablePositions({ rankStart, rankEnd, teamColor });
+      const detailedPositions = url.searchParams.get("detailedPositions") !== "false";
+      const result = listAvailablePositions({ rankStart, rankEnd, teamColor, detailedPositions });
       if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
       return send(response, 200, result);
     }
@@ -120,7 +121,8 @@ const server = http.createServer(async (request, response) => {
       const teamColor = (url.searchParams.get("teamColor") || "").trim();
       const offset = integer(url, "offset", 0, 0, 100000);
       const limit = integer(url, "limit", 3, 1, 30);
-      const result = getPickRates({ rankStart, rankEnd, teamColor, position, offset, limit });
+      const detailedPositions = url.searchParams.get("detailedPositions") !== "false";
+      const result = getPickRates({ rankStart, rankEnd, teamColor, position, offset, limit, detailedPositions });
       if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
       return send(response, 200, {
         ...result,

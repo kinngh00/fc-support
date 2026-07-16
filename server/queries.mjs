@@ -1,5 +1,18 @@
 import { db, getActiveSnapshot } from "./database.mjs";
 
+const groupedPositionMembers = {
+  CB: ["LCB", "CB", "RCB"],
+  CDM: ["LDM", "CDM", "RDM"],
+  CM: ["LCM", "CM", "RCM"],
+  CAM: ["LAM", "CAM", "RAM"],
+  CF: ["LF", "CF", "RF"],
+  ST: ["LS", "ST", "RS"],
+};
+
+function groupedPositionName(name) {
+  return Object.entries(groupedPositionMembers).find(([, members]) => members.includes(name))?.[0] || name;
+}
+
 function rankingItem(row) {
   return {
     rank: Number(row.rank),
@@ -115,7 +128,7 @@ export function getRankerOuid(nickname) {
   return db.prepare("SELECT ouid FROM rankers WHERE nickname = ? COLLATE NOCASE LIMIT 1").get(nickname)?.ouid || null;
 }
 
-export function listAvailablePositions({ rankStart, rankEnd, teamColor }) {
+export function listAvailablePositions({ rankStart, rankEnd, teamColor, detailedPositions = true }) {
   const snapshot = getActiveSnapshot();
   if (!snapshot) return null;
 
@@ -141,18 +154,26 @@ export function listAvailablePositions({ rankStart, rankEnd, teamColor }) {
     HAVING COUNT(*) > 0
   `).all(...parameters);
 
-  return {
-    snapshot,
-    items: rows.map((row) => ({ name: row.name, count: Number(row.count) })),
-  };
+  if (detailedPositions) {
+    return { snapshot, items: rows.map((row) => ({ name: row.name, count: Number(row.count) })) };
+  }
+
+  const grouped = new Map();
+  for (const row of rows) {
+    const name = groupedPositionName(row.name);
+    grouped.set(name, (grouped.get(name) || 0) + Number(row.count));
+  }
+  return { snapshot, items: [...grouped].map(([name, count]) => ({ name, count })) };
 }
 
-export function getPickRates({ rankStart, rankEnd, teamColor, position, offset, limit }) {
+export function getPickRates({ rankStart, rankEnd, teamColor, position, offset, limit, detailedPositions = true }) {
   const snapshot = getActiveSnapshot();
   if (!snapshot) return null;
 
-  const positionRow = db.prepare("SELECT position_id FROM position_metadata WHERE name = ?").get(position);
-  if (!positionRow) return { snapshot, matchingManagers: 0, positionTotal: 0, totalItems: 0, items: [] };
+  const positionNames = detailedPositions ? [position] : (groupedPositionMembers[position] || [position]);
+  const placeholders = positionNames.map(() => "?").join(", ");
+  const positionRows = db.prepare(`SELECT position_id FROM position_metadata WHERE name IN (${placeholders})`).all(...positionNames);
+  if (positionRows.length === 0) return { snapshot, matchingManagers: 0, positionTotal: 0, totalItems: 0, items: [] };
 
   const teamClause = teamColor
     ? "AND EXISTS (SELECT 1 FROM json_each(e.team_colors_json) c WHERE json_extract(c.value, '$.name') = ?)"
@@ -167,14 +188,14 @@ export function getPickRates({ rankStart, rankEnd, teamColor, position, offset, 
       WHERE e.snapshot_id = ? AND e.rank BETWEEN ? AND ? AND e.lineup_status = 'READY'
       ${teamClause}
     ), picks AS (
-      SELECT l.spid, l.grade, l.position_id, COUNT(*) AS pick_count
+      SELECT l.spid, l.grade, COUNT(*) AS pick_count
       FROM lineup_players l
       JOIN eligible q ON q.ranker_id = l.ranker_id
-      WHERE l.snapshot_id = ${Number(snapshot.id)} AND l.position_id = ?
-      GROUP BY l.spid, l.grade, l.position_id
+      WHERE l.snapshot_id = ${Number(snapshot.id)} AND l.position_id IN (${positionRows.map(() => "?").join(", ")})
+      GROUP BY l.spid, l.grade
     )
   `;
-  const common = [...parameters, Number(positionRow.position_id)];
+  const common = [...parameters, ...positionRows.map((row) => Number(row.position_id))];
   const matchingManagers = Number(db.prepare(`
     SELECT COUNT(*) AS count FROM ranking_entries e
     WHERE e.snapshot_id = ? AND e.rank BETWEEN ? AND ? AND e.lineup_status = 'READY'
@@ -185,10 +206,9 @@ export function getPickRates({ rankStart, rankEnd, teamColor, position, offset, 
   const rows = db.prepare(`${cte}
     SELECT
       p.spid, m.pid, m.season_id, m.name, m.season_name, m.season_image,
-      p.grade, p.position_id, pos.name AS position, p.pick_count
+      p.grade, p.pick_count
     FROM picks p
     LEFT JOIN player_metadata m ON m.spid = p.spid
-    LEFT JOIN position_metadata pos ON pos.position_id = p.position_id
     ORDER BY p.pick_count DESC, m.name ASC, p.spid ASC, p.grade ASC
     LIMIT ? OFFSET ?
   `).all(...common, limit, offset);
@@ -206,7 +226,7 @@ export function getPickRates({ rankStart, rankEnd, teamColor, position, offset, 
       seasonImage: row.season_image,
       name: row.name,
       grade: Number(row.grade),
-      position: row.position,
+      position,
       count: Number(row.pick_count),
       pickRate: positionTotal === 0 ? 0 : Number(((Number(row.pick_count) / positionTotal) * 100).toFixed(2)),
     })),

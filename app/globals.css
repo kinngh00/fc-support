@@ -115,7 +115,12 @@ a { color: inherit; text-decoration: none; }
 
 .results-layout { border: 1px solid var(--line); border-top: 0; display: grid; grid-template-columns: 235px minmax(0, 1fr); }
 .position-panel { border-right: 1px solid var(--line); padding: 30px 24px; }
-.position-panel > p { color: var(--muted); font-family: var(--font-geist-mono); font-size: 12px; font-weight: 700; letter-spacing: .16em; margin: 0 0 20px; }
+.position-panel-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 20px; }
+.position-panel-heading > p { color: var(--muted); font-family: var(--font-geist-mono); font-size: 12px; font-weight: 700; letter-spacing: .16em; margin: 0; }
+.position-panel-heading > button { align-items: center; background: #e8e7df; border: 1px solid var(--line); color: var(--muted); display: flex; font-size: 10px; font-weight: 800; gap: 7px; padding: 7px 8px; }
+.position-panel-heading > button b { color: var(--ink); font-family: var(--font-geist-mono); }
+.position-panel-heading > button.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.position-panel-heading > button.active b { color: var(--lime); }
 .position-grid { display: grid; gap: 6px; grid-template-columns: repeat(3, 1fr); }
 .position-grid button { background: transparent; border: 1px solid transparent; border-radius: 2px; color: #747a74; font-family: var(--font-geist-mono); font-size: 12px; font-weight: 700; height: 38px; }
 .position-grid button:hover { border-color: var(--line); color: var(--ink); }
@@ -171,7 +176,7 @@ a { color: inherit; text-decoration: none; }
 .profile-empty { align-items: center; border: 1px dashed rgba(244,243,237,.24); color: rgba(244,243,237,.58); display: flex; justify-content: center; min-height: 150px; padding: 28px; text-align: center; }
 .profile-dashboard .profile-empty { border-color: #b7bab5; color: var(--muted); }
 .profile-empty.error { color: #a45648; }
-.profile-dashboard { display: grid; gap: 24px; }
+.profile-dashboard { color: var(--ink); display: grid; gap: 24px; }
 .profile-summary { align-items: center; background: var(--ink); color: var(--paper); display: grid; gap: 40px; grid-template-columns: .8fr 1.2fr; padding: 38px; }
 .profile-summary > div > span { color: var(--lime); font-family: var(--font-geist-mono); font-size: 13px; font-weight: 800; }
 .profile-summary h3 { font-size: 34px; letter-spacing: -.05em; margin: 10px 0 8px; }.profile-summary p { color: rgba(244,243,237,.52); margin: 0; }

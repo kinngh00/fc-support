@@ -26,7 +26,7 @@ type PickResponse = {
   hasMore: boolean;
 };
 
-type Query = { start: string; end: string; team: string; position: string };
+type Query = { start: string; end: string; team: string; position: string; detailed: boolean };
 
 type RankingItem = {
   rank: number;
@@ -93,6 +93,10 @@ function simpleSnapshotLabel(value?: string) {
   if (!value) return "시간 정보 없음";
   const match = value.match(/T(\d{2}):(\d{2})/);
   return match ? `${match[1]}:${match[2]} 기준` : "시간 정보 없음";
+}
+
+function integerLabel(value: string | number | null | undefined, minimumIntegerDigits = 1) {
+  return Number(value || 0).toLocaleString("ko-KR", { minimumIntegerDigits });
 }
 
 function clubValueLabel(value: string | null) {
@@ -180,11 +184,12 @@ function HistoryChart({ title, items, value, format }: {
 }
 
 export default function Home() {
-  const [rankStart, setRankStart] = useState("10");
-  const [rankEnd, setRankEnd] = useState("100");
+  const [rankStart, setRankStart] = useState("1");
+  const [rankEnd, setRankEnd] = useState("1000");
   const [team, setTeam] = useState("");
   const [position, setPosition] = useState("ST");
-  const [query, setQuery] = useState<Query>({ start: "10", end: "100", team: "", position: "ST" });
+  const [detailedPositions, setDetailedPositions] = useState(false);
+  const [query, setQuery] = useState<Query>({ start: "1", end: "1000", team: "", position: "ST", detailed: false });
   const [availablePositions, setAvailablePositions] = useState<string[]>([]);
   const [teamColors, setTeamColors] = useState<Array<{ name: string; managers: number }>>([]);
   const [result, setResult] = useState<PickResponse | null>(null);
@@ -323,6 +328,7 @@ export default function Home() {
       rankStart: nextQuery.start,
       rankEnd: nextQuery.end,
       position: nextQuery.position,
+      detailedPositions: String(nextQuery.detailed),
       offset: String(offset),
       limit: "3",
     });
@@ -349,6 +355,7 @@ export default function Home() {
     const parameters = new URLSearchParams({
       rankStart: nextQuery.start,
       rankEnd: nextQuery.end,
+      detailedPositions: String(nextQuery.detailed),
     });
     if (nextQuery.team) parameters.set("teamColor", nextQuery.team);
     try {
@@ -422,7 +429,7 @@ export default function Home() {
     setLoading(true);
     setResult(null);
     setError("");
-    const baseQuery = { start: rankStart, end: rankEnd, team };
+    const baseQuery = { start: rankStart, end: rankEnd, team, detailed: detailedPositions };
     const available = await fetchAvailablePositions(baseQuery);
     const nextPosition = available.includes(position) ? position : (available[0] || position);
     setPosition(nextPosition);
@@ -438,9 +445,23 @@ export default function Home() {
 
   function selectPosition(nextPosition: string) {
     setPosition(nextPosition);
-    const nextQuery = { start: rankStart, end: rankEnd, team, position: nextPosition };
+    const nextQuery = { start: rankStart, end: rankEnd, team, position: nextPosition, detailed: detailedPositions };
     setQuery(nextQuery);
     void fetchPicks(nextQuery);
+  }
+
+  async function toggleDetailedPositions() {
+    const nextDetailed = !detailedPositions;
+    setDetailedPositions(nextDetailed);
+    if (!hasSearched) return;
+
+    const baseQuery = { start: rankStart, end: rankEnd, team, detailed: nextDetailed };
+    const available = await fetchAvailablePositions(baseQuery);
+    const nextPosition = available.includes(position) ? position : (available[0] || position);
+    setPosition(nextPosition);
+    const nextQuery = { ...baseQuery, position: nextPosition };
+    setQuery(nextQuery);
+    await fetchPicks(nextQuery);
   }
 
   return (
@@ -499,7 +520,12 @@ export default function Home() {
 
         <div className="results-layout">
           <aside className="position-panel">
-            <p>POSITION</p>
+            <div className="position-panel-heading">
+              <p>POSITION</p>
+              <button type="button" className={detailedPositions ? "active" : ""} aria-pressed={detailedPositions} onClick={() => void toggleDetailedPositions()}>
+                <span>상세 포지션</span><b>{detailedPositions ? "ON" : "OFF"}</b>
+              </button>
+            </div>
             <div className="position-grid">
               {!hasSearched ? <p className="position-empty">조회 후 사용할 수 있는 포지션이 표시됩니다.</p> : availablePositions.length > 0 ? availablePositions.map((item) => (
                 <button className={position === item ? "selected" : ""} key={item} onClick={() => selectPosition(item)} type="button">{item}</button>
@@ -510,7 +536,7 @@ export default function Home() {
 
           <div className="result-content">
             {hasSearched && <div className="result-topline">
-              <div><p>{query.start}–{query.end}위 · {query.team || "전체 팀"}</p><h3>{query.position} 픽률</h3></div>
+              <div><p>{integerLabel(query.start)}–{integerLabel(query.end)}위 · {query.team || "전체 팀"}</p><h3>{query.position} 픽률</h3></div>
               {result && (
                 <div className="result-stats">
                   <span><b>{result.matchingManagers.toLocaleString()}</b> 감독</span>
@@ -581,7 +607,7 @@ export default function Home() {
               <dl>
                 <div><dt>구단가치</dt><dd>{clubValueLabel(profileResult.profile.clubValue)}</dd></div>
                 <div><dt>최근 승률</dt><dd>{profileResult.profile.winRate == null ? "정보 없음" : `${profileResult.profile.winRate.toFixed(1)}%`}</dd></div>
-                <div><dt>경기 기록</dt><dd>{profileResult.profile.wins ?? 0}승 {profileResult.profile.draws ?? 0}무 {profileResult.profile.losses ?? 0}패</dd></div>
+                <div><dt>경기 기록</dt><dd>{integerLabel(profileResult.profile.wins)}승 {integerLabel(profileResult.profile.draws)}무 {integerLabel(profileResult.profile.losses)}패</dd></div>
                 <div><dt>ELO</dt><dd>{profileResult.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
               </dl>
             </div>
@@ -665,7 +691,7 @@ export default function Home() {
             <div className="ranking-list">
               {rankingResult.items.map((ranker) => (
                 <article className={`ranking-row ${ranker.rank <= 3 ? "podium" : ""}`} key={`${ranker.rank}-${ranker.nexonSn}`}>
-                  <strong className="ranking-number">{String(ranker.rank).padStart(2, "0")}</strong>
+                  <strong className="ranking-number">{integerLabel(ranker.rank, 2)}</strong>
                   <div className="ranking-coach">
                     <h3>{ranker.nickname}</h3>
                     <span>LV. {ranker.level?.toLocaleString() ?? "정보 없음"}</span>
@@ -676,7 +702,7 @@ export default function Home() {
                   </div>
                   <span className="ranking-formation">{ranker.formation || "—"}</span>
                   <strong className="ranking-elo">{ranker.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "—"}</strong>
-                  <div className="ranking-record"><b>{ranker.winRate == null ? "—" : `${ranker.winRate.toFixed(1)}%`}</b><small>{ranker.wins ?? 0}승 {ranker.draws ?? 0}무 {ranker.losses ?? 0}패</small></div>
+                  <div className="ranking-record"><b>{ranker.winRate == null ? "—" : `${ranker.winRate.toFixed(1)}%`}</b><small>{integerLabel(ranker.wins)}승 {integerLabel(ranker.draws)}무 {integerLabel(ranker.losses)}패</small></div>
                   <span className="ranking-value">{clubValueLabel(ranker.clubValue)}</span>
                 </article>
               ))}
