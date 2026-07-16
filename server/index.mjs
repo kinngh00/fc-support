@@ -2,7 +2,7 @@ import http from "node:http";
 import { config } from "./config.mjs";
 import { isCollectionRunning, runCollection } from "./collector.mjs";
 import { getActiveSnapshot } from "./database.mjs";
-import { getPickRates, listRankings, listTeamColors, recentSnapshots } from "./queries.mjs";
+import { getPickRates, listAvailablePositions, listRankings, listTeamColors, recentSnapshots } from "./queries.mjs";
 import { startScheduler } from "./scheduler.mjs";
 import { listLogs, logger } from "./logger.mjs";
 
@@ -44,6 +44,16 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/team-colors") {
       return send(response, 200, listTeamColors());
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/positions") {
+      const rankStart = integer(url, "rankStart", 1, 1, 10000);
+      const rankEnd = integer(url, "rankEnd", 10000, 1, 10000);
+      if (rankStart > rankEnd) throw new Error("rankStart cannot be greater than rankEnd.");
+      const teamColor = (url.searchParams.get("teamColor") || "").trim();
+      const result = listAvailablePositions({ rankStart, rankEnd, teamColor });
+      if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
+      return send(response, 200, result);
     }
 
     if (request.method === "GET" && url.pathname === "/api/rankings") {

@@ -110,6 +110,7 @@ a { color: inherit; text-decoration: none; }
 .position-grid button { background: transparent; border: 1px solid transparent; border-radius: 2px; color: #747a74; font-family: var(--font-geist-mono); font-size: 12px; font-weight: 700; height: 38px; }
 .position-grid button:hover { border-color: var(--line); color: var(--ink); }
 .position-grid .selected { background: var(--ink); border-color: var(--ink); color: var(--lime); }
+.position-empty { color: var(--muted); font-size: 12px; grid-column: 1 / -1; line-height: 1.6; margin: 4px 0 8px; }
 .position-note { border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.6; margin-top: 28px; padding-top: 22px; }
 .position-note span { color: var(--ink); display: block; font-weight: 700; margin-bottom: 4px; }
 .result-content { min-width: 0; padding: 34px 38px 38px; }
@@ -125,6 +126,9 @@ a { color: inherit; text-decoration: none; }
 .player-photo { align-self: end; height: 94px; overflow: hidden; position: relative; width: 70px; }
 .player-photo::after { background: linear-gradient(transparent 70%, var(--paper)); content: ""; inset: 0; position: absolute; }
 .player-photo img { height: 100%; object-fit: contain; width: 100%; }
+.player-photo.missing { align-self: center; border: 1px dashed var(--line); height: 66px; }
+.player-photo.missing::before { align-items: center; color: var(--muted); content: "이미지 없음"; display: flex; font-size: 9px; inset: 0; justify-content: center; position: absolute; text-align: center; }
+.player-photo.missing::after { display: none; }
 .player-identity { padding-left: 18px; }
 .player-identity > div { align-items: center; display: flex; gap: 7px; }
 .player-identity > div b { background: var(--ink); border-radius: 2px; color: var(--lime); font-family: var(--font-geist-mono); font-size: 10px; padding: 4px 6px; }

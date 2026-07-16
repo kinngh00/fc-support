@@ -13,6 +13,38 @@ export function listTeamColors() {
   return { snapshot, items: rows };
 }
 
+export function listAvailablePositions({ rankStart, rankEnd, teamColor }) {
+  const snapshot = getActiveSnapshot();
+  if (!snapshot) return null;
+
+  const teamClause = teamColor
+    ? "AND EXISTS (SELECT 1 FROM json_each(e.team_colors_json) c WHERE json_extract(c.value, '$.name') = ?)"
+    : "";
+  const parameters = teamColor
+    ? [snapshot.id, rankStart, rankEnd, teamColor]
+    : [snapshot.id, rankStart, rankEnd];
+  const rows = db.prepare(`
+    WITH eligible AS (
+      SELECT e.ranker_id
+      FROM ranking_entries e
+      WHERE e.snapshot_id = ? AND e.rank BETWEEN ? AND ? AND e.lineup_status = 'READY'
+      ${teamClause}
+    )
+    SELECT pos.name, COUNT(*) AS count
+    FROM lineup_players l
+    JOIN eligible q ON q.ranker_id = l.ranker_id
+    JOIN position_metadata pos ON pos.position_id = l.position_id
+    WHERE l.snapshot_id = ${Number(snapshot.id)}
+    GROUP BY l.position_id, pos.name
+    HAVING COUNT(*) > 0
+  `).all(...parameters);
+
+  return {
+    snapshot,
+    items: rows.map((row) => ({ name: row.name, count: Number(row.count) })),
+  };
+}
+
 export function getPickRates({ rankStart, rankEnd, teamColor, position, offset, limit }) {
   const snapshot = getActiveSnapshot();
   if (!snapshot) return null;

@@ -64,10 +64,10 @@ type RankingResponse = {
   hasMore: boolean;
 };
 
-const positions = [
-  "GK", "SW", "LWB", "LB", "LCB", "CB", "RCB", "RB", "RWB",
-  "LDM", "CDM", "RDM", "LM", "LCM", "CM", "RCM", "RM",
-  "LAM", "CAM", "RAM", "LW", "LF", "CF", "RF", "RW", "LS", "ST", "RS",
+const positionPriority = [
+  "ST", "LS", "RS", "LW", "LF", "CF", "RF", "RW",
+  "CAM", "LAM", "RAM", "LM", "LCM", "CM", "RCM", "RM",
+  "LDM", "CDM", "RDM", "LWB", "LB", "LCB", "CB", "RCB", "RB", "RWB", "SW", "GK",
 ];
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8787";
 
@@ -116,8 +116,9 @@ export default function Home() {
   const [rankStart, setRankStart] = useState("10");
   const [rankEnd, setRankEnd] = useState("100");
   const [team, setTeam] = useState("");
-  const [position, setPosition] = useState("LM");
-  const [query, setQuery] = useState<Query>({ start: "10", end: "100", team: "", position: "LM" });
+  const [position, setPosition] = useState("ST");
+  const [query, setQuery] = useState<Query>({ start: "10", end: "100", team: "", position: "ST" });
+  const [availablePositions, setAvailablePositions] = useState<string[]>([]);
   const [teamColors, setTeamColors] = useState<Array<{ name: string; managers: number }>>([]);
   const [result, setResult] = useState<PickResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,11 +191,34 @@ export default function Home() {
     }
   }
 
+  async function fetchAvailablePositions(nextQuery: Omit<Query, "position">) {
+    const parameters = new URLSearchParams({
+      rankStart: nextQuery.start,
+      rankEnd: nextQuery.end,
+    });
+    if (nextQuery.team) parameters.set("teamColor", nextQuery.team);
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/positions?${parameters}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "포지션 정보를 불러오지 못했습니다.");
+      const names = new Set<string>(
+        Array.isArray(payload.items) ? payload.items.map((item: { name: string }) => item.name) : [],
+      );
+      const ordered = positionPriority.filter((item) => names.has(item));
+      setAvailablePositions(ordered);
+      return ordered;
+    } catch {
+      setAvailablePositions([]);
+      return [];
+    }
+  }
+
   useEffect(() => {
-    const initialQuery = { start: "10", end: "100", team: "", position: "LM" };
+    const initialQuery = { start: "10", end: "100", team: "", position: "ST" };
     // Initial API synchronization intentionally begins after the client mounts.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchPicks(initialQuery);
+    void fetchAvailablePositions(initialQuery);
     void fetchRankings();
     void fetch(`${apiBaseUrl}/api/team-colors`, { cache: "no-store" })
       .then((response) => response.json())
@@ -227,11 +251,19 @@ export default function Home() {
     };
   }, []);
 
+  async function applyFilters() {
+    const baseQuery = { start: rankStart, end: rankEnd, team };
+    const available = await fetchAvailablePositions(baseQuery);
+    const nextPosition = available.includes(position) ? position : (available[0] || position);
+    setPosition(nextPosition);
+    const nextQuery = { ...baseQuery, position: nextPosition };
+    setQuery(nextQuery);
+    await fetchPicks(nextQuery);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextQuery = { start: rankStart, end: rankEnd, team, position };
-    setQuery(nextQuery);
-    void fetchPicks(nextQuery);
+    void applyFilters();
   }
 
   function selectPosition(nextPosition: string) {
@@ -303,9 +335,9 @@ export default function Home() {
           <aside className="position-panel">
             <p>POSITION</p>
             <div className="position-grid">
-              {positions.map((item) => (
+              {availablePositions.length > 0 ? availablePositions.map((item) => (
                 <button className={position === item ? "selected" : ""} key={item} onClick={() => selectPosition(item)} type="button">{item}</button>
-              ))}
+              )) : <p className="position-empty">사용 데이터가 있는 포지션이 없습니다.</p>}
             </div>
             <div className="position-note"><span>선발 기준</span>교체 선수와 상대 선수는 집계에서 제외됩니다.</div>
           </aside>
@@ -331,7 +363,16 @@ export default function Home() {
                   {result.items.map((player, index) => (
                     <article className="player-row" key={`${player.spid}-${player.grade}`}>
                       <span className="list-rank">{String(index + 1).padStart(2, "0")}</span>
-                      <div className="player-photo"><img alt="" src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${player.spid}.png`} /></div>
+                      <div className="player-photo">
+                        <img
+                          alt={`${player.name || "선수"} 액션샷`}
+                          src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`}
+                          onError={(event) => {
+                            event.currentTarget.hidden = true;
+                            event.currentTarget.parentElement?.classList.add("missing");
+                          }}
+                        />
+                      </div>
                       <div className="player-identity">
                         <div><span className={`season season-${seasonLabel(player.season).toLowerCase()}`}>{seasonLabel(player.season)}</span><b>+{player.grade}</b></div>
                         <h4>{player.name || "선수명 정보 없음"}</h4><small>SPID {player.spid}</small>
