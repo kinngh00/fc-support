@@ -3,7 +3,7 @@ import { db } from "./database.mjs";
 import { getRankerOuid } from "./queries.mjs";
 import { latestManagerMatchPath, mapWithKeyPool, matchDetailPath, nexonJson } from "./nexon-api.mjs";
 
-const selectPlayerMetadata = db.prepare("SELECT name, season_name FROM player_metadata WHERE spid = ?");
+const selectPlayerMetadata = db.prepare("SELECT name, season_name, season_image FROM player_metadata WHERE spid = ?");
 const selectPositionMetadata = db.prepare("SELECT name FROM position_metadata WHERE position_id = ?");
 
 function participantSummary(participant) {
@@ -35,6 +35,7 @@ function playerSummary(player) {
     spid: String(spid),
     name: metadata?.name || null,
     season: metadata?.season_name || null,
+    seasonImage: metadata?.season_image || null,
     position: position?.name || null,
     grade: Number(player.spGrade ?? 0),
     status: player.status || null,

@@ -57,7 +57,7 @@ type RankingResponse = {
 
 type HistoryItem = { dataTime: string; rank: number; clubValue: string; winRate: number | null };
 type HistoryFrame = "hour" | "day" | "week";
-type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null };
+type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null; seasonImage: string | null };
 type UserProfileResponse = {
   snapshot: { id: number; data_time: string };
   profile: RankingItem & { hasOuid: boolean };
@@ -211,6 +211,15 @@ function PlayerImage({ spid, name, wrapperClassName = "", preserveSpace = false 
     : <img alt={`${name} 선수 이미지`} src={image} onError={() => setSource((current) => current === "official" ? "player" : "missing")} />;
   if (wrapperClassName) return <div className={`${wrapperClassName} ${source === "missing" ? "missing" : ""}`}>{content}</div>;
   return content;
+}
+
+function SeasonBadge({ season, image }: { season: string | null; image: string | null }) {
+  const label = season || "시즌 정보 없음";
+  return (
+    <span className="season-badge" data-tooltip={`시즌명: ${label}`} title={`시즌명: ${label}`} tabIndex={0}>
+      {image ? <img src={image} alt={`${label} 시즌`} /> : <span>{seasonLabel(season)}</span>}
+    </span>
+  );
 }
 
 function HistoryChart({ title, items, value, format, frame }: {
@@ -675,7 +684,7 @@ export default function Home() {
                       <span className="list-rank">{String(index + 1).padStart(2, "0")}</span>
                       <PlayerImage spid={player.spid} name={player.name || "선수"} wrapperClassName="player-photo" />
                       <div className="player-identity">
-                        <div><span className={`season season-${seasonLabel(player.season).toLowerCase()}`}>{seasonLabel(player.season)}</span><b>+{player.grade}</b></div>
+                        <div><SeasonBadge season={player.season} image={player.seasonImage} /><b>+{player.grade}</b></div>
                         <h4>{player.name || "선수명 정보 없음"}</h4><small>SPID {player.spid}</small>
                       </div>
                       <div className="pick-meter">
@@ -729,7 +738,7 @@ export default function Home() {
             <div className="profile-block">
               <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
               {profileResult.squad.length > 0 ? <div className="squad-grid">{profileResult.squad.map((player) => (
-                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small><small>SPID {player.spid}</small></div></article>
+                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small><small>SPID {player.spid}</small></div></article>
               ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
             </div>
 
@@ -893,7 +902,7 @@ export default function Home() {
                     <div className="modal-content-block">
                       <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{modalProfile.squad.length}명</b></div>
                       {modalProfile.squad.length > 0 ? <div className="squad-grid">{modalProfile.squad.map((player) => (
-                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small><small>SPID {player.spid}</small></div></article>
+                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small><small>SPID {player.spid}</small></div></article>
                       ))}</div> : <div className="modal-state">저장된 선발 스쿼드가 없습니다.</div>}
                     </div>
                   )}

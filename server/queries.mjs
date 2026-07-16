@@ -100,7 +100,7 @@ export function getUserProfile(nickname) {
 
   const squad = db.prepare(`
     SELECT
-      l.slot, l.spid, l.grade, l.position_id, p.name, p.season_name,
+      l.slot, l.spid, l.grade, l.position_id, p.name, p.season_name, p.season_image,
       pos.name AS position
     FROM lineup_players l
     LEFT JOIN player_metadata p ON p.spid = l.spid
@@ -114,6 +114,7 @@ export function getUserProfile(nickname) {
     position: item.position,
     name: item.name,
     season: item.season_name,
+    seasonImage: item.season_image,
   }));
 
   return {

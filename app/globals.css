@@ -147,8 +147,13 @@ a { color: inherit; text-decoration: none; }
 .player-identity { padding-left: 18px; }
 .player-identity > div { align-items: center; display: flex; gap: 7px; }
 .player-identity > div b { background: var(--ink); border-radius: 2px; color: var(--lime); font-family: var(--font-geist-mono); font-size: 10px; padding: 4px 6px; }
-.season { background: #d8ddd4; border-radius: 2px; color: #304136; font-family: var(--font-geist-mono); font-size: 10px; font-weight: 800; padding: 4px 7px; }
-.season-fac { background: #e9d7f3; color: #603b73; }.season-ch { background: #f4d9cd; color: #7b3d27; }.season-cu { background: #d8e6f2; color: #2e5575; }
+.season-badge { align-items: center; display: inline-flex; flex: 0 0 auto; min-height: 20px; position: relative; }
+.season-badge > img { display: block; height: 20px; max-width: 46px; object-fit: contain; width: auto; }
+.season-badge > span { background: #d8ddd4; border-radius: 2px; color: #304136; font-family: var(--font-geist-mono); font-size: 10px; font-weight: 800; padding: 4px 7px; }
+.season-badge::after { background: var(--ink); bottom: calc(100% + 8px); color: var(--paper); content: attr(data-tooltip); font-size: 12px; font-weight: 700; left: 50%; line-height: 1.35; opacity: 0; padding: 7px 9px; pointer-events: none; position: absolute; transform: translate(-50%, 4px); transition: opacity .15s ease, transform .15s ease; visibility: hidden; white-space: nowrap; z-index: 20; }
+.season-badge:hover::after, .season-badge:focus-visible::after { opacity: 1; transform: translate(-50%, 0); visibility: visible; }
+.squad-season { align-items: center; display: flex; gap: 6px; margin-top: 3px; overflow: visible !important; }
+.squad-season .season-badge > img { height: 16px; max-width: 40px; }
 .player-identity h4 { font-size: 20px; letter-spacing: -.03em; margin: 8px 0 2px; }
 .player-identity small { color: #7f847f; font-family: var(--font-geist-mono); font-size: 11px; }
 .pick-meter { padding-left: 24px; }
