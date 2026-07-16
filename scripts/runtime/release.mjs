@@ -17,6 +17,7 @@ import {
 
 const command = process.argv[2] || "deploy";
 const frontendPorts = { a: 3100, b: 3101 };
+const vinextPorts = { a: 3300, b: 3301 };
 const backendPorts = { a: 8880, b: 8881 };
 
 function run(commandName, args, options = {}) {
@@ -72,7 +73,11 @@ async function prepareRelease() {
     env: { ...commonEnv, FC_BACKEND_PORT: String(backendPorts[slot]), FC_FRONTEND_ORIGIN: "http://localhost:3000" },
     logName: `backend-${releaseId}`,
   });
-  const frontendPid = spawnDetached(process.execPath, ["node_modules/vinext/dist/cli.js", "start"], {
+  const frontendPid = spawnDetached(process.execPath, [
+    "scripts/runtime/frontend-server.mjs",
+    `port=${frontendPorts[slot]}`,
+    `vinextPort=${vinextPorts[slot]}`,
+  ], {
     cwd: releaseDir,
     env: { ...commonEnv, PORT: String(frontendPorts[slot]), NEXT_PUBLIC_API_BASE_URL: "http://localhost:8787" },
     logName: `frontend-${releaseId}`,
