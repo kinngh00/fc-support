@@ -328,6 +328,11 @@ function SeasonBadge({ season, image }: { season: string | null; image: string |
   );
 }
 
+function EnhancementBadge({ grade }: { grade: number }) {
+  const style = grade <= 1 ? "gray" : grade <= 4 ? "copper" : grade <= 7 ? "silver" : grade <= 10 ? "gold" : "platinum";
+  return <span className={`enhancement-badge enhancement-${style}`} aria-label={`${grade}강`}>+{grade}</span>;
+}
+
 function CompactSwitch({ label, checked, onChange, disabled = false }: {
   label: string; checked: boolean; onChange: () => void; disabled?: boolean;
 }) {
@@ -372,7 +377,7 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
           <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>OVR {player.ovr}</strong></div>
           <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="formation-player-image" />
           <b className="formation-player-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
-          <div className="formation-player-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><b>+{player.grade}</b>{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
+          <div className="formation-player-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} />{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
           <div className="formation-player-price"><span>급여 {player.pay}</span><b>{squadPriceLabel(player.price)}</b></div>
         </article>
         );
@@ -427,7 +432,7 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
   return <>
     <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3><small className="squad-adaptation-note">모든 선수는 적응도 5로 표시됩니다.</small></div><div className="squad-heading-tools"><b>{squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={() => setFormationView((current) => !current)} /></div></div>
     {formationView && details ? <FormationPitch details={details} fallbackFormation={formation} /> : squad.length > 0 ? <div className="squad-grid">{orderedSquad(squad).map((player) => (
-      <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
+      <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} /></small></div></article>
     ))}</div> : <div className={emptyClassName}>저장된 선발 스쿼드가 없습니다.</div>}
     {loading ? <div className="squad-detail-loading">감독과 팀컬러 정보를 확인하고 있습니다.</div> : error ? <div className="squad-detail-loading error">{error}</div> : details ? <SquadSupportDetails details={details} /> : null}
   </>;
@@ -985,7 +990,7 @@ export default function Home() {
                       <span className="list-rank">{String(index + 1).padStart(2, "0")}</span>
                       <PlayerImage spid={player.spid} name={player.name || "선수"} wrapperClassName="player-photo" />
                       <div className="player-identity">
-                        <div><SeasonBadge season={player.season} image={player.seasonImage} /><b>+{player.grade}</b></div>
+                        <div><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} /></div>
                         <h4>{player.name || "선수명 정보 없음"}</h4>
                       </div>
                       <div className="pick-meter">
