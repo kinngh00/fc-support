@@ -16,6 +16,7 @@
     "production:activate": "node scripts/runtime/release.mjs activate",
     "production:deploy": "node scripts/runtime/release.mjs deploy",
     "production:status": "node scripts/runtime/release.mjs status",
+    "verify:scope": "node scripts/verify-change-scope.mjs",
     "collect": "node --env-file-if-exists=.env server/collect.mjs",
     "collect:ranking-check": "node --env-file-if-exists=.env server/check-ranking.mjs",
     "sync:team-assets": "node --env-file-if-exists=.env server/sync-team-assets.mjs",

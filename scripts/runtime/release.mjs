@@ -37,6 +37,7 @@ function copyRelease(releaseDir) {
 }
 
 async function prepareRelease() {
+  await run(process.execPath, [path.join(rootDir, "scripts", "verify-change-scope.mjs"), "--release"], { cwd: rootDir });
   ensureRuntimeDirectories();
   const state = readJson(statePath, {});
   if (state.pending?.frontendPid) {

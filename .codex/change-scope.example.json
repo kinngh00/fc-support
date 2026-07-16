@@ -1,0 +1,24 @@
+{
+  "task": "사용자가 요청한 변경을 한 문장으로 정확히 적습니다.",
+  "allowedFiles": [
+    "app/page.tsx",
+    "app/globals.css"
+  ],
+  "allowedRegions": {
+    "app/page.tsx": [
+      "변경이 허용된 컴포넌트 또는 함수 이름"
+    ],
+    "app/globals.css": [
+      "변경이 허용된 CSS 선택자"
+    ]
+  },
+  "visualChange": true,
+  "visualVerification": {
+    "status": "pending",
+    "requiredViewports": [
+      "desktop",
+      "mobile"
+    ],
+    "evidence": []
+  }
+}
