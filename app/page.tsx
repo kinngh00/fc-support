@@ -331,7 +331,7 @@ function CompactSwitch({ label, checked, onChange, disabled = false }: {
 }
 
 function FormationPitch({ details, fallbackFormation }: { details: SquadProfileDetails; fallbackFormation: string | null }) {
-  const pitchX = (value: number) => Math.max(8, Math.min(92, 50 + (value - 50) * 1.65));
+  const pitchX = (value: number) => Math.max(10, Math.min(90, 50 + (value - 50) * 2.05));
   const pitchY = (value: number) => Math.max(7, Math.min(88, 6 + value * 1.2));
   return <div className="formation-view">
     <div className="formation-view-title"><span>FORMATION</span><b>{details.formation || fallbackFormation || "포메이션 정보 없음"}</b></div>
