@@ -77,8 +77,8 @@ export function nicknamePath(nickname) {
   return `/fconline/v1/id?nickname=${encodeURIComponent(nickname)}`;
 }
 
-export function latestManagerMatchPath(ouid) {
-  return `/fconline/v1/user/match?ouid=${encodeURIComponent(ouid)}&matchtype=52&offset=0&limit=1`;
+export function latestManagerMatchPath(ouid, offset = 0, limit = 1) {
+  return `/fconline/v1/user/match?ouid=${encodeURIComponent(ouid)}&matchtype=52&offset=${offset}&limit=${limit}`;
 }
 
 export function matchDetailPath(matchId) {

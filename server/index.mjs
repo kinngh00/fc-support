@@ -2,10 +2,11 @@ import http from "node:http";
 import { config } from "./config.mjs";
 import { isCollectionRunning, runCollection } from "./collector.mjs";
 import { failAbandonedSnapshots, getActiveSnapshot } from "./database.mjs";
-import { getPickRates, listAvailablePositions, listRankings, listTeamColors, recentSnapshots, searchRankings } from "./queries.mjs";
+import { getPickRates, getUserProfile, listAvailablePositions, listRankings, listTeamColors, recentSnapshots, searchRankings, suggestNicknames } from "./queries.mjs";
 import { startScheduler } from "./scheduler.mjs";
 import { listLogs, logger } from "./logger.mjs";
 import { inspectSnapshotFreshness } from "./freshness.mjs";
+import { listRecentMatches } from "./match-service.mjs";
 
 function send(response, status, payload) {
   response.writeHead(status, {
@@ -83,6 +84,31 @@ const server = http.createServer(async (request, response) => {
       const result = searchRankings({ nickname, limit: 20 });
       if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
       return send(response, 200, { ...result, offset: 0, limit: 20, hasMore: result.total > result.items.length });
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/users/suggestions") {
+      const prefix = (url.searchParams.get("prefix") || "").trim();
+      if (prefix.length > 50) throw new Error("prefix must be 50 characters or fewer.");
+      return send(response, 200, suggestNicknames(prefix, 10));
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/users/profile") {
+      const nickname = (url.searchParams.get("nickname") || "").trim();
+      if (!nickname) throw new Error("nickname is required.");
+      const result = getUserProfile(nickname);
+      if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
+      if (!result.profile) return send(response, 404, { code: "USER_NOT_FOUND", message: "현재 랭킹에서 구단주를 찾지 못했습니다." });
+      return send(response, 200, result);
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/users/matches") {
+      const nickname = (url.searchParams.get("nickname") || "").trim();
+      if (!nickname) throw new Error("nickname is required.");
+      const offset = integer(url, "offset", 0, 0, 1000);
+      const limit = integer(url, "limit", 20, 1, 20);
+      const result = await listRecentMatches({ nickname, offset, limit });
+      if (!result) return send(response, 404, { code: "OUID_NOT_FOUND", message: "구단주의 경기 식별 정보를 찾지 못했습니다." });
+      return send(response, 200, result);
     }
 
     if (request.method === "GET" && url.pathname === "/api/pick-rates") {

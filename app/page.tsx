@@ -64,6 +64,24 @@ type RankingResponse = {
   hasMore: boolean;
 };
 
+type HistoryItem = { dataTime: string; rank: number; clubValue: string; winRate: number | null };
+type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null };
+type UserProfileResponse = {
+  snapshot: { id: number; data_time: string };
+  profile: RankingItem & { hasOuid: boolean };
+  history: HistoryItem[];
+  squad: SquadItem[];
+};
+type MatchParticipant = {
+  nickname: string | null; result: string | null; score: number; possession: number;
+  shots: number; effectiveShots: number; passTry: number; passSuccess: number;
+  fouls: number; corners: number; yellowCards: number; redCards: number;
+};
+type MatchItem = {
+  matchId: string; matchDate: string; self: MatchParticipant | null; opponent: MatchParticipant | null;
+  players: { self: SquadItem[]; opponent: SquadItem[] };
+};
+
 const positionPriority = [
   "ST", "LS", "RS", "LW", "LF", "CF", "RF", "RW",
   "CAM", "LAM", "RAM", "LM", "LCM", "CM", "RCM", "RM",
@@ -78,6 +96,12 @@ function seasonLabel(season: string | null) {
 function snapshotLabel(value?: string) {
   if (!value) return "수집 데이터 없음";
   return value.replace("T", " ").replace("+09:00", " KST");
+}
+
+function simpleSnapshotLabel(value?: string) {
+  if (!value) return "시간 정보 없음";
+  const match = value.match(/T(\d{2}):(\d{2})/);
+  return match ? `${match[1]}:${match[2]} 기준` : "시간 정보 없음";
 }
 
 function logTime(value: string) {
@@ -112,6 +136,70 @@ function paginationItems(current: number, total: number) {
   return result;
 }
 
+function TeamAutocomplete({ id, label, value, options, onChange, onSelect }: {
+  id: string; label: string; value: string; options: string[]; onChange: (value: string) => void; onSelect?: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const normalized = value.trim().toLocaleLowerCase("ko-KR");
+  const matches = options
+    .filter((option) => !normalized || option.toLocaleLowerCase("ko-KR").startsWith(normalized))
+    .slice(0, 12);
+  return (
+    <div className="autocomplete-field">
+      <label htmlFor={id}>{label}</label>
+      <input id={id} role="combobox" aria-controls={`${id}-options`} aria-expanded={open} autoComplete="off" value={value} placeholder="전체 팀" onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 120)} onChange={(event) => { onChange(event.target.value); setOpen(true); }} />
+      {open && matches.length > 0 && <div className="autocomplete-menu" id={`${id}-options`} role="listbox">
+        {!normalized && <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(""); onSelect?.(""); setOpen(false); }}>전체 팀</button>}
+        {matches.map((option) => <button type="button" role="option" aria-selected={value === option} key={option} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(option); onSelect?.(option); setOpen(false); }}>{option}</button>)}
+      </div>}
+    </div>
+  );
+}
+
+function NicknameAutocomplete({ id, label, value, onChange }: {
+  id: string; label: string; value: string; onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ nickname: string; rank: number }>>([]);
+  useEffect(() => {
+    const prefix = value.trim();
+    if (!open || !prefix) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const parameters = new URLSearchParams({ prefix });
+      void fetch(`${apiBaseUrl}/api/users/suggestions?${parameters}`, { cache: "no-store", signal: controller.signal })
+        .then((response) => response.json())
+        .then((payload) => setSuggestions(Array.isArray(payload.items) ? payload.items : []))
+        .catch(() => setSuggestions([]));
+    }, 100);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [open, value]);
+  return (
+    <div className="autocomplete-field nickname-autocomplete">
+      <label htmlFor={id}>{label}</label>
+      <input id={id} role="combobox" aria-controls={`${id}-options`} aria-expanded={open} autoComplete="off" value={value} placeholder="닉네임 입력" onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 120)} onChange={(event) => { onChange(event.target.value); if (!event.target.value.trim()) setSuggestions([]); setOpen(true); }} />
+      {open && suggestions.length > 0 && <div className="autocomplete-menu" id={`${id}-options`} role="listbox">
+        {suggestions.map((item) => <button type="button" role="option" aria-selected={value === item.nickname} key={`${item.rank}-${item.nickname}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item.nickname); setOpen(false); }}><span>{item.nickname}</span><small>{item.rank.toLocaleString()}위</small></button>)}
+      </div>}
+    </div>
+  );
+}
+
+function HistoryChart({ title, items, value, format }: {
+  title: string; items: HistoryItem[]; value: (item: HistoryItem) => number | null; format: (item: HistoryItem) => string;
+}) {
+  const points = items.map(value).filter((item): item is number => item != null && Number.isFinite(item));
+  if (points.length < 2) return <div className="history-chart empty"><h4>{title}</h4><p>변화를 보여줄 기록이 아직 부족합니다.</p></div>;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const coordinates = points.map((point, index) => {
+    const x = 8 + (index / Math.max(points.length - 1, 1)) * 284;
+    const y = max === min ? 70 : 130 - ((point - min) / (max - min)) * 110;
+    return `${x},${y}`;
+  }).join(" ");
+  return <div className="history-chart"><div><h4>{title}</h4><strong>{format(items.at(-1)!)}</strong></div><svg viewBox="0 0 300 140" role="img" aria-label={`${title} 변화`}><polyline points={coordinates} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg><small>{simpleSnapshotLabel(items[0]?.dataTime)} → {simpleSnapshotLabel(items.at(-1)?.dataTime)}</small></div>;
+}
+
 export default function Home() {
   const [rankStart, setRankStart] = useState("10");
   const [rankEnd, setRankEnd] = useState("100");
@@ -137,6 +225,15 @@ export default function Home() {
   const [rankingNickname, setRankingNickname] = useState("");
   const [rankingSearchActive, setRankingSearchActive] = useState(false);
   const [rankingSearchLabel, setRankingSearchLabel] = useState("");
+  const [profileNickname, setProfileNickname] = useState("");
+  const [profileResult, setProfileResult] = useState<UserProfileResponse | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesHasMore, setMatchesHasMore] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<MatchItem | null>(null);
+  const teamColorNames = teamColors.map((color) => color.name).sort((a, b) => a.localeCompare(b, "ko-KR"));
 
   function scrollToRankingTop() {
     window.requestAnimationFrame(() => {
@@ -195,6 +292,48 @@ export default function Home() {
       setRankingError(requestError instanceof Error ? requestError.message : "구단주 검색에 실패했습니다.");
     } finally {
       setRankingLoading(false);
+    }
+  }
+
+  async function loadRecentMatches(nickname: string, offset = 0, append = false) {
+    setMatchesLoading(true);
+    try {
+      const parameters = new URLSearchParams({ nickname, offset: String(offset), limit: "20" });
+      const response = await fetch(`${apiBaseUrl}/api/users/matches?${parameters}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "최근 경기를 불러오지 못했습니다.");
+      const nextItems = Array.isArray(payload.items) ? payload.items : [];
+      setMatches((current) => append ? [...current, ...nextItems] : nextItems);
+      setMatchesHasMore(Boolean(payload.hasMore));
+      if (!append) setSelectedMatch(nextItems[0] || null);
+    } catch (requestError) {
+      if (!append) setMatches([]);
+      setProfileError(requestError instanceof Error ? requestError.message : "최근 경기를 불러오지 못했습니다.");
+    } finally {
+      setMatchesLoading(false);
+    }
+  }
+
+  async function searchProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nickname = profileNickname.trim();
+    if (!nickname) return;
+    setProfileLoading(true);
+    setProfileError("");
+    setProfileResult(null);
+    setMatches([]);
+    setSelectedMatch(null);
+    try {
+      const parameters = new URLSearchParams({ nickname });
+      const response = await fetch(`${apiBaseUrl}/api/users/profile?${parameters}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "구단주 정보를 불러오지 못했습니다.");
+      setProfileResult(payload);
+      if (payload.profile?.hasOuid) void loadRecentMatches(payload.profile.nickname);
+    } catch (requestError) {
+      setProfileError(requestError instanceof Error ? requestError.message : "구단주 정보를 불러오지 못했습니다.");
+    } finally {
+      setProfileLoading(false);
     }
   }
 
@@ -359,24 +498,20 @@ export default function Home() {
             <label><span>끝 순위</span><input aria-label="끝 순위" inputMode="numeric" min="1" max="10000" type="number" value={rankEnd} onChange={(event) => setRankEnd(event.target.value)} /><b>위</b></label>
           </fieldset>
 
-          <label className="select-field">
-            <span>팀컬러</span>
-            <select value={team} onChange={(event) => setTeam(event.target.value)}>
-              <option value="">전체 팀</option>
-              {teamColors.map((color) => <option value={color.name} key={color.name}>{color.name}</option>)}
-            </select>
-          </label>
+          <div className="select-field">
+            <TeamAutocomplete id="pick-team-color" label="팀컬러" value={team} options={teamColorNames} onChange={setTeam} />
+          </div>
 
           <button className="search-button" type="submit" disabled={loading}>
             <span>{loading ? "조회 중" : "픽률 조회"}</span><b aria-hidden="true">↗</b>
           </button>
         </form>
 
-        {hasSearched && <div className="results-layout">
+        <div className="results-layout">
           <aside className="position-panel">
             <p>POSITION</p>
             <div className="position-grid">
-              {availablePositions.length > 0 ? availablePositions.map((item) => (
+              {!hasSearched ? <p className="position-empty">조회 후 사용할 수 있는 포지션이 표시됩니다.</p> : availablePositions.length > 0 ? availablePositions.map((item) => (
                 <button className={position === item ? "selected" : ""} key={item} onClick={() => selectPosition(item)} type="button">{item}</button>
               )) : <p className="position-empty">사용 데이터가 있는 포지션이 없습니다.</p>}
             </div>
@@ -384,7 +519,7 @@ export default function Home() {
           </aside>
 
           <div className="result-content">
-            <div className="result-topline">
+            {hasSearched && <div className="result-topline">
               <div><p>{query.start}–{query.end}위 · {query.team || "전체 팀"}</p><h3>{query.position} 픽률</h3></div>
               {result && (
                 <div className="result-stats">
@@ -392,9 +527,11 @@ export default function Home() {
                   <span><b>{result.positionTotal.toLocaleString()}</b> {query.position} 기용</span>
                 </div>
               )}
-            </div>
+            </div>}
 
-            {loading ? (
+            {!hasSearched ? (
+              <div className="empty-state"><span>NO RESULT</span><h4>검색 결과가 없습니다.</h4><p>순위와 팀컬러를 선택한 뒤 픽률 조회를 눌러주세요.</p></div>
+            ) : loading ? (
               <div className="empty-state"><span>LOADING</span><h4>수집된 데이터를 확인하고 있습니다.</h4></div>
             ) : error ? (
               <div className="empty-state"><span>NO DATA</span><h4>{error}</h4><p>데이터를 임의로 생성하지 않습니다.<br />수집이 완료되면 실제 결과만 표시됩니다.</p></div>
@@ -435,7 +572,72 @@ export default function Home() {
               <div className="empty-state"><span>NO RESULT</span><h4>조건에 맞는 선발 데이터가 없습니다.</h4><p>조회 범위 또는 팀컬러와 포지션을 변경해 보세요.</p></div>
             )}
           </div>
-        </div>}
+        </div>
+      </section>
+
+      <section className="user-search-section" id="user-search">
+        <div className="user-search-heading">
+          <div><p className="section-kicker">MANAGER PROFILE</p><h2>구단주 전적 검색</h2><p>닉네임으로 순위 변화, 스쿼드와 최근 경기를 확인하세요.</p></div>
+          <form className="profile-search-form" onSubmit={searchProfile}>
+            <NicknameAutocomplete id="profile-nickname" label="구단주 닉네임" value={profileNickname} onChange={setProfileNickname} />
+            <button type="submit" disabled={profileLoading}>{profileLoading ? "검색 중" : "검색"}</button>
+          </form>
+        </div>
+
+        {profileError ? <div className="profile-empty error">{profileError}</div> : profileLoading ? <div className="profile-empty">구단주 정보를 불러오는 중입니다.</div> : profileResult ? (
+          <div className="profile-dashboard">
+            <div className="profile-summary">
+              <div><span>{profileResult.profile.rank.toLocaleString()}위</span><h3>{profileResult.profile.nickname}</h3><p>{profileResult.profile.primaryTeamColor || "팀컬러 없음"} · {profileResult.profile.formation || "포메이션 정보 없음"}</p></div>
+              <dl>
+                <div><dt>구단가치</dt><dd>{clubValueLabel(profileResult.profile.clubValue)}</dd></div>
+                <div><dt>최근 승률</dt><dd>{profileResult.profile.winRate == null ? "정보 없음" : `${profileResult.profile.winRate.toFixed(1)}%`}</dd></div>
+                <div><dt>경기 기록</dt><dd>{profileResult.profile.wins ?? 0}승 {profileResult.profile.draws ?? 0}무 {profileResult.profile.losses ?? 0}패</dd></div>
+                <div><dt>ELO</dt><dd>{profileResult.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
+              </dl>
+            </div>
+
+            <div className="history-grid">
+              <HistoryChart title="순위 변화" items={profileResult.history} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} />
+              <HistoryChart title="구단가치 변화" items={profileResult.history} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} />
+              <HistoryChart title="승률 변화" items={profileResult.history} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} />
+            </div>
+
+            <div className="profile-block">
+              <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
+              {profileResult.squad.length > 0 ? <div className="squad-grid">{profileResult.squad.map((player) => (
+                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><img src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`} alt={`${player.name || "선수"} 액션샷`} onError={(event) => { event.currentTarget.hidden = true; }} /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
+              ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
+            </div>
+
+            <div className="profile-block match-block">
+              <div className="profile-block-heading"><div><span>RECENT MATCHES</span><h3>최근 경기</h3></div><b>{matches.length}경기</b></div>
+              <div className="matches-layout">
+                <div className="match-list">
+                  {matches.length === 0 && !matchesLoading ? <div className="profile-empty">최근 감독모드 경기가 없습니다.</div> : matches.map((match) => (
+                    <button className={selectedMatch?.matchId === match.matchId ? "selected" : ""} type="button" key={match.matchId} onClick={() => setSelectedMatch(match)}>
+                      <span className={`match-result result-${match.self?.result || "없음"}`}>{match.self?.result || "결과 없음"}</span>
+                      <div><b>{match.self?.nickname || profileResult.profile.nickname} {match.self?.score ?? 0} : {match.opponent?.score ?? 0} {match.opponent?.nickname || "상대 정보 없음"}</b><small>{String(match.matchDate || "").replace("T", " ").slice(0, 16)}</small></div>
+                    </button>
+                  ))}
+                  {matchesHasMore && <button className="matches-more" type="button" disabled={matchesLoading} onClick={() => void loadRecentMatches(profileResult.profile.nickname, matches.length, true)}>{matchesLoading ? "불러오는 중" : "20경기 더 보기"}</button>}
+                </div>
+                <div className="match-detail">
+                  {selectedMatch?.self && selectedMatch.opponent ? <>
+                    <div className="match-score"><span>{selectedMatch.self.nickname}</span><strong>{selectedMatch.self.score} : {selectedMatch.opponent.score}</strong><span>{selectedMatch.opponent.nickname}</span></div>
+                    {[
+                      ["점유율", `${selectedMatch.self.possession}%`, `${selectedMatch.opponent.possession}%`],
+                      ["슈팅", selectedMatch.self.shots, selectedMatch.opponent.shots],
+                      ["유효 슈팅", selectedMatch.self.effectiveShots, selectedMatch.opponent.effectiveShots],
+                      ["패스 성공", `${selectedMatch.self.passSuccess}/${selectedMatch.self.passTry}`, `${selectedMatch.opponent.passSuccess}/${selectedMatch.opponent.passTry}`],
+                      ["파울", selectedMatch.self.fouls, selectedMatch.opponent.fouls],
+                      ["코너킥", selectedMatch.self.corners, selectedMatch.opponent.corners],
+                    ].map(([label, selfValue, opponentValue]) => <div className="match-stat" key={String(label)}><b>{selfValue}</b><span>{label}</span><b>{opponentValue}</b></div>)}
+                  </> : <div className="profile-empty">경기를 선택하면 상세 내용이 표시됩니다.</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : <div className="profile-empty">구단주를 검색하면 저장된 정보와 최근 경기가 표시됩니다.</div>}
       </section>
 
       <section className="log-section" id="backend-logs">
@@ -481,35 +683,23 @@ export default function Home() {
           <div>
             <p className="section-kicker">MANAGER MODE RANKING</p>
             <h2>감독모드 랭킹</h2>
-            <p className="ranking-description">활성 스냅샷의 1위부터 10,000위까지 실제 랭킹입니다.</p>
+            <p className="ranking-description">FC 온라인 감독모드 상위 10,000명의 순위와 팀 정보를 확인하세요.</p>
           </div>
           <div className="ranking-controls">
             <form className="ranking-search" onSubmit={searchRanking}>
-              <label htmlFor="ranking-nickname">구단주 닉네임 검색</label>
-              <div><input id="ranking-nickname" value={rankingNickname} onChange={(event) => setRankingNickname(event.target.value)} placeholder="닉네임 입력" /><button type="submit">검색</button></div>
+              <NicknameAutocomplete id="ranking-nickname" label="구단주 닉네임 검색" value={rankingNickname} onChange={setRankingNickname} />
+              <button type="submit">검색</button>
             </form>
-            <label className="ranking-filter">
-              <span>팀컬러 필터</span>
-              <select
-                value={rankingTeam}
-                onChange={(event) => {
-                  const nextTeam = event.target.value;
-                  setRankingTeam(nextTeam);
-                  setRankingNickname("");
-                  void fetchRankings(nextTeam, 1);
-                }}
-              >
-                <option value="">전체 팀</option>
-                {teamColors.map((color) => <option value={color.name} key={color.name}>{color.name} · {color.managers.toLocaleString()}명</option>)}
-              </select>
-            </label>
+            <div className="ranking-filter">
+              <TeamAutocomplete id="ranking-team-color" label="팀컬러 필터" value={rankingTeam} options={teamColorNames} onChange={setRankingTeam} onSelect={(nextTeam) => { setRankingNickname(""); void fetchRankings(nextTeam, 1); }} />
+            </div>
           </div>
         </div>
 
         <div className="ranking-board">
           <div className="ranking-board-meta">
             <span>{rankingSearchActive ? `NICKNAME · ${rankingSearchLabel}` : rankingTeam || "ALL TEAM COLORS"}</span>
-            <p>{rankingResult ? `${rankingResult.total.toLocaleString()}명` : "데이터 없음"} · {snapshotLabel(rankingResult?.snapshot.data_time)}</p>
+            <p>{rankingResult ? `${rankingResult.total.toLocaleString()}명 · ${simpleSnapshotLabel(rankingResult.snapshot.data_time)}` : "데이터 없음"}</p>
           </div>
           <div className="ranking-table-head" aria-hidden="true">
             <span>순위</span><span>구단주</span><span>팀컬러</span><span>포메이션</span><span>ELO</span><span>승률</span><span>구단가치</span>

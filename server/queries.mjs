@@ -32,9 +32,87 @@ export function listTeamColors() {
     FROM ranking_entries e, json_each(e.team_colors_json) color
     WHERE e.snapshot_id = ? AND json_extract(color.value, '$.name') <> ''
     GROUP BY name
-    ORDER BY managers DESC, name ASC
+    ORDER BY name COLLATE NOCASE ASC
   `).all(snapshot.id);
   return { snapshot, items: rows };
+}
+
+export function suggestNicknames(prefix, limit = 10) {
+  const snapshot = getActiveSnapshot();
+  if (!snapshot || !prefix) return { snapshot, items: [] };
+  const escaped = prefix.replace(/[\\%_]/g, "\\$&");
+  const rows = db.prepare(`
+    SELECT r.nickname, e.rank
+    FROM ranking_entries e
+    JOIN rankers r ON r.id = e.ranker_id
+    WHERE e.snapshot_id = ? AND r.nickname LIKE ? ESCAPE '\\' COLLATE NOCASE
+    ORDER BY r.nickname COLLATE NOCASE ASC, e.rank ASC
+    LIMIT ?
+  `).all(snapshot.id, `${escaped}%`, limit);
+  return { snapshot, items: rows.map((row) => ({ nickname: row.nickname, rank: Number(row.rank) })) };
+}
+
+export function getUserProfile(nickname) {
+  const snapshot = getActiveSnapshot();
+  if (!snapshot) return null;
+  const row = db.prepare(`
+    SELECT
+      r.id AS ranker_id, r.ouid,
+      e.rank, r.nickname, r.nexon_sn, e.level,
+      CAST(e.club_value AS TEXT) AS club_value,
+      e.elo, e.win_rate, e.wins, e.draws, e.losses,
+      e.team_colors_json, e.primary_team_color, e.team_color_count,
+      e.formation, e.current_grade, e.best_grade, e.previous_grade,
+      asset.image_url AS team_image,
+      e.lineup_status
+    FROM ranking_entries e
+    JOIN rankers r ON r.id = e.ranker_id
+    LEFT JOIN team_color_assets asset ON asset.name = e.primary_team_color
+    WHERE e.snapshot_id = ? AND r.nickname = ? COLLATE NOCASE
+    LIMIT 1
+  `).get(snapshot.id, nickname);
+  if (!row) return { snapshot, profile: null, history: [], squad: [] };
+
+  const history = db.prepare(`
+    SELECT data_time, rank, CAST(club_value AS TEXT) AS club_value, win_rate
+    FROM ranking_history
+    WHERE ranker_id = ?
+    ORDER BY datetime(data_time) ASC
+  `).all(row.ranker_id).map((item) => ({
+    dataTime: item.data_time,
+    rank: Number(item.rank),
+    clubValue: String(item.club_value),
+    winRate: item.win_rate == null ? null : Number(item.win_rate),
+  }));
+
+  const squad = db.prepare(`
+    SELECT
+      l.slot, l.spid, l.grade, l.position_id, p.name, p.season_name,
+      pos.name AS position
+    FROM lineup_players l
+    LEFT JOIN player_metadata p ON p.spid = l.spid
+    LEFT JOIN position_metadata pos ON pos.position_id = l.position_id
+    WHERE l.snapshot_id = ? AND l.ranker_id = ?
+    ORDER BY l.slot ASC
+  `).all(snapshot.id, row.ranker_id).map((item) => ({
+    slot: Number(item.slot),
+    spid: String(item.spid),
+    grade: Number(item.grade),
+    position: item.position,
+    name: item.name,
+    season: item.season_name,
+  }));
+
+  return {
+    snapshot,
+    profile: { ...rankingItem(row), hasOuid: Boolean(row.ouid) },
+    history,
+    squad,
+  };
+}
+
+export function getRankerOuid(nickname) {
+  return db.prepare("SELECT ouid FROM rankers WHERE nickname = ? COLLATE NOCASE LIMIT 1").get(nickname)?.ouid || null;
 }
 
 export function listAvailablePositions({ rankStart, rankEnd, teamColor }) {

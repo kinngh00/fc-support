@@ -66,6 +66,9 @@ flowchart LR
 | `GET /api/team-colors` | 실제 수집된 팀컬러 목록 |
 | `GET /api/pick-rates` | 조건별 포지션 선수 픽률 |
 | `GET /api/rankings` | 감독모드 랭킹 페이지 |
+| `GET /api/users/suggestions` | 입력 중인 글자로 시작하는 구단주 닉네임 |
+| `GET /api/users/profile` | 구단주의 현재 정보·30일 기록·선발 스쿼드 |
+| `GET /api/users/matches` | 구단주의 최근 감독모드 경기 20개씩 조회 |
 | `GET /api/logs` | 최근 백엔드 로그 |
 | `POST /api/admin/collect` | 관리자 수동 수집 시작 |
 
