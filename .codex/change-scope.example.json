@@ -1,5 +1,26 @@
 {
   "task": "사용자가 요청한 변경을 한 문장으로 정확히 적습니다.",
+  "userInstructions": [
+    "사용자의 첫 번째 지시 원문",
+    "사용자의 두 번째 지시 원문"
+  ],
+  "requirements": [
+    {
+      "id": "R1",
+      "instruction": "첫 번째 지시를 독립된 요구사항으로 기록합니다.",
+      "implementation": "이 요구사항을 구현할 정확한 영역과 방법을 기록합니다.",
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "R2",
+      "instruction": "두 번째 지시를 다른 요구사항으로 기록합니다.",
+      "implementation": "두 번째 요구사항의 구현 방법을 기록합니다.",
+      "status": "pending",
+      "evidence": []
+    }
+  ],
+  "assumptions": [],
   "allowedFiles": [
     "app/page.tsx",
     "app/globals.css"
@@ -10,6 +31,20 @@
     ],
     "app/globals.css": [
       "변경이 허용된 CSS 선택자"
+    ]
+  },
+  "changeMap": {
+    "app/page.tsx": [
+      {
+        "region": "변경이 허용된 컴포넌트 또는 함수 이름",
+        "requirementIds": ["R1"]
+      }
+    ],
+    "app/globals.css": [
+      {
+        "region": "변경이 허용된 CSS 선택자",
+        "requirementIds": ["R2"]
+      }
     ]
   },
   "visualChange": true,
