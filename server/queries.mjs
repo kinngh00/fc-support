@@ -265,14 +265,7 @@ export function searchRankings({ nickname, limit = 20 }) {
   const snapshot = getActiveSnapshot();
   if (!snapshot) return null;
   const escaped = nickname.replace(/[\\%_]/g, "\\$&");
-  const pattern = `%${escaped}%`;
-
-  const total = Number(db.prepare(`
-    SELECT COUNT(*) AS count
-    FROM ranking_entries e
-    JOIN rankers r ON r.id = e.ranker_id
-    WHERE e.snapshot_id = ? AND r.nickname LIKE ? ESCAPE '\\' COLLATE NOCASE
-  `).get(snapshot.id, pattern).count);
+  const pattern = `${escaped}%`;
 
   const rows = db.prepare(`
     SELECT
@@ -287,9 +280,9 @@ export function searchRankings({ nickname, limit = 20 }) {
     JOIN rankers r ON r.id = e.ranker_id
     LEFT JOIN team_color_assets asset ON asset.name = e.primary_team_color
     WHERE e.snapshot_id = ? AND r.nickname LIKE ? ESCAPE '\\' COLLATE NOCASE
-    ORDER BY CASE WHEN r.nickname = ? COLLATE NOCASE THEN 0 ELSE 1 END, e.rank ASC
+    ORDER BY r.nickname COLLATE NOCASE ASC, e.rank ASC
     LIMIT ?
-  `).all(snapshot.id, pattern, nickname, limit);
+  `).all(snapshot.id, pattern, limit);
 
-  return { snapshot, total, items: rows.map(rankingItem) };
+  return { snapshot, total: rows.length, items: rows.map(rankingItem) };
 }

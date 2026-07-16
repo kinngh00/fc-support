@@ -403,6 +403,46 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const nickname = rankingNickname.trim();
+    if (!nickname) {
+      if (rankingSearchActive) void fetchRankings(rankingTeam, 1);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setRankingLoading(true);
+      setRankingError("");
+      try {
+        const parameters = new URLSearchParams({ nickname });
+        const response = await fetch(`${apiBaseUrl}/api/rankings/search?${parameters}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || "구단주 검색에 실패했습니다.");
+        setRankingResult(payload);
+        setRankingPage(1);
+        setRankingSearchActive(true);
+        setRankingSearchLabel(nickname);
+      } catch (requestError) {
+        if (controller.signal.aborted) return;
+        setRankingResult(null);
+        setRankingError(requestError instanceof Error ? requestError.message : "구단주 검색에 실패했습니다.");
+      } finally {
+        if (!controller.signal.aborted) setRankingLoading(false);
+      }
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+    // Nickname changes are the only trigger; ranking/team state is handled inside each request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankingNickname]);
+
+  useEffect(() => {
     let active = true;
     async function loadLogs() {
       try {
@@ -577,7 +617,7 @@ export default function Home() {
 
       <section className="user-search-section" id="user-search">
         <div className="user-search-heading">
-          <div><p className="section-kicker">MANAGER PROFILE</p><h2>구단주 전적 검색</h2><p>닉네임으로 순위 변화, 스쿼드와 최근 경기를 확인하세요.</p></div>
+          <div><p className="section-kicker">MANAGER PROFILE</p><h2>구단주 검색</h2><p>닉네임으로 순위 변화, 스쿼드와 최근 경기를 확인하세요.</p></div>
           <form className="profile-search-form" onSubmit={searchProfile}>
             <NicknameAutocomplete id="profile-nickname" label="구단주 닉네임" value={profileNickname} onChange={setProfileNickname} />
             <button type="submit" disabled={profileLoading}>{profileLoading ? "검색 중" : "검색"}</button>

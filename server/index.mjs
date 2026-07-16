@@ -81,9 +81,9 @@ const server = http.createServer(async (request, response) => {
       const nickname = (url.searchParams.get("nickname") || "").trim();
       if (!nickname) throw new Error("nickname is required.");
       if (nickname.length > 50) throw new Error("nickname must be 50 characters or fewer.");
-      const result = searchRankings({ nickname, limit: 20 });
+      const result = searchRankings({ nickname, limit: 10 });
       if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
-      return send(response, 200, { ...result, offset: 0, limit: 20, hasMore: result.total > result.items.length });
+      return send(response, 200, { ...result, offset: 0, limit: 10, hasMore: false });
     }
 
     if (request.method === "GET" && url.pathname === "/api/users/suggestions") {
