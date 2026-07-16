@@ -121,9 +121,10 @@ export default function Home() {
   const [availablePositions, setAvailablePositions] = useState<string[]>([]);
   const [teamColors, setTeamColors] = useState<Array<{ name: string; managers: number }>>([]);
   const [result, setResult] = useState<PickResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
   const [logs, setLogs] = useState<BackendLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState("");
@@ -214,11 +215,8 @@ export default function Home() {
   }
 
   useEffect(() => {
-    const initialQuery = { start: "10", end: "100", team: "", position: "ST" };
-    // Initial API synchronization intentionally begins after the client mounts.
+    // Initial ranking synchronization intentionally begins after the client mounts.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchPicks(initialQuery);
-    void fetchAvailablePositions(initialQuery);
     void fetchRankings();
     void fetch(`${apiBaseUrl}/api/team-colors`, { cache: "no-store" })
       .then((response) => response.json())
@@ -252,6 +250,10 @@ export default function Home() {
   }, []);
 
   async function applyFilters() {
+    setHasSearched(true);
+    setLoading(true);
+    setResult(null);
+    setError("");
     const baseQuery = { start: rankStart, end: rankEnd, team };
     const available = await fetchAvailablePositions(baseQuery);
     const nextPosition = available.includes(position) ? position : (available[0] || position);
@@ -306,7 +308,7 @@ export default function Home() {
         <div className="section-heading">
           <div><p className="section-kicker">PLAYER PICK RATE</p><h2>선수 픽률 조회</h2></div>
           <div className={`data-status ${error ? "status-error" : ""}`}>
-            <span className="status-dot" /> {loading ? "데이터 확인 중" : snapshotLabel(result?.snapshot.data_time)}
+            <span className="status-dot" /> {!hasSearched ? "조회 전" : loading ? "데이터 확인 중" : snapshotLabel(result?.snapshot.data_time)}
           </div>
         </div>
 
@@ -331,7 +333,7 @@ export default function Home() {
           </button>
         </form>
 
-        <div className="results-layout">
+        {hasSearched && <div className="results-layout">
           <aside className="position-panel">
             <p>POSITION</p>
             <div className="position-grid">
@@ -394,7 +396,7 @@ export default function Home() {
               <div className="empty-state"><span>NO RESULT</span><h4>조건에 맞는 선발 데이터가 없습니다.</h4><p>조회 범위 또는 팀컬러와 포지션을 변경해 보세요.</p></div>
             )}
           </div>
-        </div>
+        </div>}
       </section>
 
       <section className="log-section" id="backend-logs">
