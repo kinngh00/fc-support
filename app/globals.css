@@ -200,6 +200,7 @@ a { color: inherit; text-decoration: none; }
 .history-chart-plot circle { cursor: pointer; outline: none; stroke: var(--paper); stroke-width: 2; transition: r .12s ease, fill .12s ease; }
 .history-chart-plot circle:hover, .history-chart-plot circle:focus, .history-chart-plot circle.active { fill: var(--lime); stroke: var(--green); }
 .history-chart-tooltip { background: var(--ink); color: var(--paper); display: grid; gap: 4px; min-width: 136px; padding: 8px 10px; pointer-events: none; position: absolute; transform: translate(-50%, calc(-100% - 10px)); white-space: nowrap; z-index: 5; }
+.history-chart-tooltip.below { transform: translate(-50%, 12px); }
 .history-chart-tooltip span { color: rgba(244,243,237,.65); font-size: 11px; }
 .history-chart-tooltip b { color: var(--lime); font-family: var(--font-geist-mono); font-size: 13px; }
 .history-chart-change { align-items: center !important; border-top: 1px solid var(--line); display: flex !important; margin-top: 10px; padding-top: 12px; }
@@ -218,19 +219,25 @@ a { color: inherit; text-decoration: none; }
   background: #e9e8e0;
   column-gap: 12px;
   display: grid;
-  grid-template-columns: 38px 72px minmax(0, 1fr);
+  grid-template-columns: 48px 72px minmax(0, 1fr);
   min-height: 112px;
-  padding: 12px;
+  padding: 0 12px 0 0;
 }
 .squad-grid article > span {
-  align-self: center;
-  color: var(--green);
+  align-items: center;
+  align-self: stretch;
+  color: #fff;
+  display: flex;
   font-family: var(--font-geist-mono);
   font-size: 12px;
   font-weight: 800;
   grid-column: 1;
-  justify-self: start;
+  justify-content: center;
+  justify-self: stretch;
 }
+.squad-grid article.position-defense > span { background: #1476ff; }
+.squad-grid article.position-midfield > span { background: #03cd7a; }
+.squad-grid article.position-attack > span { background: #f6425f; }
 .squad-grid article > img, .squad-player-image-missing {
   align-self: center;
   display: block;
@@ -397,7 +404,7 @@ footer p { color: var(--muted); font-size: 13px; margin: 0; } footer small { col
   .ranking-coach::before { content: "구단주"; }
   .ranking-team::before { content: "팀컬러"; }
   .ranking-formation::before { content: "포메이션"; }
-  .ranking-elo::before { content: "ELO"; }
+  .ranking-elo::before { content: "점수"; }
   .ranking-record::before { content: "승률"; }
   .ranking-value::before { content: "구단가치"; }
   .ranking-team { align-items: flex-start; padding-right: 0; }

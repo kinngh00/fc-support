@@ -80,6 +80,14 @@ const positionPriority = [
   "CAM", "LAM", "RAM", "LM", "LCM", "CM", "RCM", "RM",
   "LDM", "CDM", "RDM", "LWB", "LB", "LCB", "CB", "RCB", "RB", "RWB", "SW", "GK",
 ];
+const attackingPositions = new Set(["ST", "LS", "RS", "LW", "LF", "CF", "RF", "RW"]);
+const midfieldPositions = new Set(["CAM", "LAM", "RAM", "LM", "LCM", "CM", "RCM", "RM", "LDM", "CDM", "RDM"]);
+
+function positionGroup(position: string | null) {
+  if (position && attackingPositions.has(position)) return "attack";
+  if (position && midfieldPositions.has(position)) return "midfield";
+  return "defense";
+}
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8787";
 
 function seasonLabel(season: string | null) {
@@ -345,7 +353,7 @@ function HistoryChart({ title, items, value, format, frame, change }: {
           })}
         </svg>
         {active && activeCoordinate && <div
-          className="history-chart-tooltip"
+          className={`history-chart-tooltip ${activeCoordinate.y < 60 ? "below" : ""}`}
           style={{
             left: `${Math.min(plotWidth - 72, Math.max(72, activeCoordinate.x))}px`,
             top: `${(activeCoordinate.y / 140) * 100}%`,
@@ -845,7 +853,7 @@ export default function Home() {
                 <div><dt>구단가치</dt><dd>{clubValueLabel(profileResult.profile.clubValue)}</dd></div>
                 <div><dt>최근 승률</dt><dd>{profileResult.profile.winRate == null ? "정보 없음" : `${profileResult.profile.winRate.toFixed(1)}%`}</dd></div>
                 <div><dt>경기 기록</dt><dd>{integerLabel(profileResult.profile.wins)}승 {integerLabel(profileResult.profile.draws)}무 {integerLabel(profileResult.profile.losses)}패</dd></div>
-                <div><dt>ELO</dt><dd>{profileResult.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
+                <div><dt>점수</dt><dd>{profileResult.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
               </dl>
             </div>
 
@@ -859,7 +867,7 @@ export default function Home() {
             <div className="profile-block">
               <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
               {profileResult.squad.length > 0 ? <div className="squad-grid">{profileResult.squad.map((player) => (
-                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
+                <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
               ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
             </div>
 
@@ -918,7 +926,7 @@ export default function Home() {
             <p>{rankingResult ? `${rankingResult.total.toLocaleString()}명 · ${simpleSnapshotLabel(rankingResult.snapshot.data_time)}` : "데이터 없음"}</p>
           </div>
           <div className="ranking-table-head" aria-hidden="true">
-            <span>순위</span><span>구단주</span><span>팀컬러</span><span>포메이션</span><span>ELO</span><span>승률</span><span>구단가치</span>
+            <span>순위</span><span>구단주</span><span>팀컬러</span><span>포메이션</span><span>점수</span><span>승률</span><span>구단가치</span>
           </div>
 
           {rankingLoading ? (
@@ -1008,7 +1016,7 @@ export default function Home() {
                           <div><dt>구단가치</dt><dd>{clubValueLabel(modalProfile.profile.clubValue)}</dd></div>
                           <div><dt>최근 승률</dt><dd>{modalProfile.profile.winRate == null ? "정보 없음" : `${modalProfile.profile.winRate.toFixed(1)}%`}</dd></div>
                           <div><dt>경기 기록</dt><dd>{integerLabel(modalProfile.profile.wins)}승 {integerLabel(modalProfile.profile.draws)}무 {integerLabel(modalProfile.profile.losses)}패</dd></div>
-                          <div><dt>ELO</dt><dd>{modalProfile.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
+                          <div><dt>점수</dt><dd>{modalProfile.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
                         </dl>
                       </div>
                       <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={modalHistoryFrame} onChange={setModalHistoryFrame} /></div>
@@ -1023,7 +1031,7 @@ export default function Home() {
                     <div className="modal-content-block">
                       <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{modalProfile.squad.length}명</b></div>
                       {modalProfile.squad.length > 0 ? <div className="squad-grid">{modalProfile.squad.map((player) => (
-                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
+                        <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
                       ))}</div> : <div className="modal-state">저장된 선발 스쿼드가 없습니다.</div>}
                     </div>
                   )}
