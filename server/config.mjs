@@ -15,6 +15,7 @@ function boolean(name, fallback) {
   return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
 }
 
+// Boot-time collection behavior is configurable so test and blue-green instances stay isolated.
 export const config = {
   port: integer("FC_BACKEND_PORT", 8787, { min: 1, max: 65535 }),
   host: process.env.FC_BACKEND_HOST || "127.0.0.1",
@@ -23,6 +24,8 @@ export const config = {
   adminToken: process.env.FC_ADMIN_TOKEN || "",
   schedulerEnabled: boolean("FC_SCHEDULER_ENABLED", true),
   collectOnEmpty: boolean("FC_COLLECT_ON_EMPTY", true),
+  collectOnStale: boolean("FC_COLLECT_ON_STALE", true),
+  recoverAbandonedSnapshots: boolean("FC_RECOVER_ABANDONED_SNAPSHOTS", true),
   rankingConcurrency: integer("FC_RANKING_CONCURRENCY", 5, { min: 1, max: 20 }),
   apiConcurrencyPerKey: integer("FC_API_CONCURRENCY_PER_KEY", 2, { min: 1, max: 8 }),
   nexonApiKeys: (process.env.NEXON_API_KEYS || "")

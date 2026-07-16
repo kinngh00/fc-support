@@ -163,7 +163,7 @@ const server = http.createServer(async (request, response) => {
 
 server.listen(config.port, config.host, () => {
   logger.success("서버", "백엔드 서버가 시작되었습니다.", { url: `http://${config.host}:${config.port}` });
-  const abandonedCount = failAbandonedSnapshots();
+  const abandonedCount = config.recoverAbandonedSnapshots ? failAbandonedSnapshots() : 0;
   if (abandonedCount > 0) {
     logger.warn("수집 복구", "이전 서버 종료로 미완료된 스냅샷을 실패 처리했습니다.", { count: abandonedCount });
   }
@@ -180,7 +180,7 @@ server.listen(config.port, config.host, () => {
     }
   } else if (activeSnapshot) {
     const freshness = inspectSnapshotFreshness(activeSnapshot);
-    if (!freshness.fresh && config.nexonApiKeys.length > 0) {
+    if (!freshness.fresh && config.collectOnStale && config.nexonApiKeys.length > 0) {
       logger.warn("신선도 검사", "활성 스냅샷이 최신 기대 시각보다 오래되어 즉시 재집계를 시작합니다.", {
         snapshotId: activeSnapshot.id,
         snapshotDataTime: freshness.snapshotDataTime,
@@ -189,8 +189,10 @@ server.listen(config.port, config.host, () => {
       runCollection().catch((error) => {
         logger.error("신선도 검사", "오래된 스냅샷의 재집계가 실패했습니다.", { error: String(error?.message || error) });
       });
-    } else if (!freshness.fresh) {
+    } else if (!freshness.fresh && config.collectOnStale) {
       logger.warn("신선도 검사", "활성 스냅샷이 오래됐지만 API 키가 없어 재집계를 시작하지 못했습니다.", freshness);
+    } else if (!freshness.fresh) {
+      logger.info("신선도 검사", "테스트 환경에서는 오래된 데이터의 자동 재집계를 실행하지 않습니다.", freshness);
     } else {
       logger.info("신선도 검사", "활성 스냅샷이 최신 상태입니다.", {
         snapshotId: activeSnapshot.id,

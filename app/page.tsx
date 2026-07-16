@@ -387,7 +387,10 @@ export default function Home() {
   useEffect(() => {
     const nickname = rankingNickname.trim();
     if (!nickname) {
-      if (rankingSearchActive) void fetchRankings(rankingTeam, 1);
+      if (rankingSearchActive) {
+        const timer = window.setTimeout(() => void fetchRankings(rankingTeam, 1), 0);
+        return () => window.clearTimeout(timer);
+      }
       return;
     }
 

@@ -1,12 +1,15 @@
 import { config, requireApiKeys } from "./config.mjs";
 import {
+  acquireCollectionLock,
   createSnapshot,
   db,
   failSnapshot,
   promoteSnapshot,
+  releaseCollectionLock,
   transaction,
   updateSnapshot,
 } from "./database.mjs";
+import { randomUUID } from "node:crypto";
 import { fetchAllRankings } from "./ranking-source.mjs";
 import { expectedKstDataTime } from "./freshness.mjs";
 import { logger } from "./logger.mjs";
@@ -413,7 +416,12 @@ async function performCollection() {
 
 export function runCollection() {
   if (activeCollection) return activeCollection;
+  const owner = `${process.pid}:${randomUUID()}`;
+  if (!acquireCollectionLock(owner)) {
+    return Promise.reject(new Error("다른 서버 인스턴스에서 이미 집계를 진행하고 있습니다."));
+  }
   activeCollection = performCollection().finally(() => {
+    releaseCollectionLock(owner);
     activeCollection = null;
   });
   return activeCollection;

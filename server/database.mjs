@@ -191,6 +191,44 @@ export function failAbandonedSnapshots() {
   return Number(result.changes);
 }
 
+export function acquireCollectionLock(owner) {
+  return transaction(() => {
+    const current = db.prepare("SELECT value FROM app_state WHERE key = 'collection_lock'").get();
+    if (current) {
+      try {
+        const lock = JSON.parse(current.value);
+        const age = Date.now() - Number(lock.acquiredAt || 0);
+        let processAlive = false;
+        if (Number.isInteger(lock.pid) && lock.pid > 0) {
+          try {
+            process.kill(lock.pid, 0);
+            processAlive = true;
+          } catch {}
+        }
+        if (processAlive && age < 6 * 60 * 60 * 1000) return false;
+      } catch {}
+      db.prepare("DELETE FROM app_state WHERE key = 'collection_lock'").run();
+    }
+    db.prepare("INSERT INTO app_state (key, value) VALUES ('collection_lock', ?)").run(JSON.stringify({
+      owner,
+      pid: process.pid,
+      acquiredAt: Date.now(),
+    }));
+    return true;
+  });
+}
+
+export function releaseCollectionLock(owner) {
+  const current = db.prepare("SELECT value FROM app_state WHERE key = 'collection_lock'").get();
+  if (!current) return;
+  try {
+    if (JSON.parse(current.value).owner !== owner) return;
+  } catch {
+    return;
+  }
+  db.prepare("DELETE FROM app_state WHERE key = 'collection_lock'").run();
+}
+
 export function promoteSnapshot(id) {
   transaction(() => {
     const current = getActiveSnapshot();
