@@ -65,7 +65,9 @@ type SquadItem = { slot: number; spid: string; grade: number; position: string |
 type SquadProfileDetails = {
   formation: string | null;
   adaptation: number;
-  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; seasonImage: string | null; image: string | null; ovr: number; pay: number; price: string | null; nationId: string | null; nationImage: string | null; x: number; y: number }>;
+  sourceKind?: "latest-manager-match";
+  sourceMatchId?: string | null;
+  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; seasonImage: string | null; image: string | null; ovr: number | null; pay: number | null; price: string | null; nationId: string | null; nationImage: string | null; x: number; y: number }>;
   coach: { id: string; name: string; image: string | null; description: string | null; abilities: string[]; formations: string[] } | null;
   teamColors: Array<{ id: string; category: string; categoryLabel: string; level: number; name: string; effects: string[]; image: string | null; playerCount: number }>;
 };
@@ -363,11 +365,11 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
             "--mobile-player-bottom": `${pitchY(player.y)}%`,
           } as CSSProperties}
         >
-          <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>OVR {player.ovr}</strong></div>
+          <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
           <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="formation-player-image" />
           <b className="formation-player-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
           <div className="formation-player-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} />{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
-          <div className="formation-player-price"><span>급여 {player.pay}</span><b>{squadPriceLabel(player.price)}</b></div>
+          <div className="formation-player-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
         </article>
       ))}
     </div>
@@ -427,11 +429,11 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
     <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3><small className="squad-adaptation-note">모든 선수는 적응도 5로 표시됩니다.</small></div><div className="squad-heading-tools"><b>{details?.players.length ?? squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={() => setFormationView((current) => !current)} /></div></div>
     {formationView && details ? <FormationPitch details={details} fallbackFormation={formation} /> : detailedSquad.length > 0 ? <div className="squad-grid squad-grid-detailed">{detailedSquad.map((player) => (
       <article className={`position-${positionGroup(player.position)}`} key={`${player.spid}-${player.position}`}>
-        <div className="squad-card-heading"><b>{player.position || "—"}</b><strong>OVR {player.ovr}</strong></div>
+        <div className="squad-card-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
         <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="squad-card-image" />
         <b className="squad-card-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
         <div className="squad-card-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} />{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
-        <div className="squad-card-price"><span>급여 {player.pay}</span><b>{squadPriceLabel(player.price)}</b></div>
+        <div className="squad-card-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
       </article>
     ))}</div> : loading ? <div className={emptyClassName}>현재 선발 스쿼드를 불러오고 있습니다.</div> : <div className={emptyClassName}>저장된 선발 스쿼드가 없습니다.</div>}
     {loading ? <div className="squad-detail-loading">감독과 팀컬러 정보를 확인하고 있습니다.</div> : error ? <div className="squad-detail-loading error">{error}</div> : details ? <SquadSupportDetails details={details} /> : null}
