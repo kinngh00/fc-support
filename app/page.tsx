@@ -56,6 +56,7 @@ type RankingResponse = {
 };
 
 type HistoryItem = { dataTime: string; rank: number; clubValue: string; winRate: number | null };
+type HistoryFrame = "hour" | "day" | "week";
 type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null };
 type UserProfileResponse = {
   snapshot: { id: number; data_time: string };
@@ -97,6 +98,30 @@ function simpleSnapshotLabel(value?: string) {
 
 function integerLabel(value: string | number | null | undefined, minimumIntegerDigits = 1) {
   return Number(value || 0).toLocaleString("ko-KR", { minimumIntegerDigits });
+}
+
+function historyBucket(dataTime: string, frame: HistoryFrame) {
+  const date = new Date(dataTime);
+  if (frame === "hour") return dataTime.slice(0, 13);
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  if (frame === "day") return kst.toISOString().slice(0, 10);
+  const day = kst.getUTCDay() || 7;
+  kst.setUTCDate(kst.getUTCDate() - day + 1);
+  return kst.toISOString().slice(0, 10);
+}
+
+function aggregateHistory(items: HistoryItem[], frame: HistoryFrame) {
+  if (frame === "hour") return items;
+  const buckets = new Map<string, HistoryItem>();
+  for (const item of items) buckets.set(historyBucket(item.dataTime, frame), item);
+  return [...buckets.values()];
+}
+
+function historyPointLabel(value: string | undefined, frame: HistoryFrame) {
+  if (!value) return "시간 정보 없음";
+  if (frame === "hour") return simpleSnapshotLabel(value);
+  const label = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" }).format(new Date(value));
+  return frame === "week" ? `${label} 주` : label;
 }
 
 function clubValueLabel(value: string | null) {
@@ -168,8 +193,14 @@ function NicknameAutocomplete({ id, label, value, onChange }: {
   );
 }
 
-function HistoryChart({ title, items, value, format }: {
-  title: string; items: HistoryItem[]; value: (item: HistoryItem) => number | null; format: (item: HistoryItem) => string;
+function HistoryFrameToggle({ value, onChange }: { value: HistoryFrame; onChange: (frame: HistoryFrame) => void }) {
+  return <div className="history-frame-toggle" aria-label="차트 조회 단위">
+    {([['hour', '1시간봉'], ['day', '일봉'], ['week', '주봉']] as const).map(([frame, label]) => <button type="button" className={value === frame ? "active" : ""} aria-pressed={value === frame} key={frame} onClick={() => onChange(frame)}>{label}</button>)}
+  </div>;
+}
+
+function HistoryChart({ title, items, value, format, frame }: {
+  title: string; items: HistoryItem[]; value: (item: HistoryItem) => number | null; format: (item: HistoryItem) => string; frame: HistoryFrame;
 }) {
   const points = items.map(value).filter((item): item is number => item != null && Number.isFinite(item));
   if (points.length < 2) return <div className="history-chart empty"><h4>{title}</h4><p>변화를 보여줄 기록이 아직 부족합니다.</p></div>;
@@ -180,7 +211,7 @@ function HistoryChart({ title, items, value, format }: {
     const y = max === min ? 70 : 130 - ((point - min) / (max - min)) * 110;
     return `${x},${y}`;
   }).join(" ");
-  return <div className="history-chart"><div><h4>{title}</h4><strong>{format(items.at(-1)!)}</strong></div><svg viewBox="0 0 300 140" role="img" aria-label={`${title} 변화`}><polyline points={coordinates} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg><small>{simpleSnapshotLabel(items[0]?.dataTime)} → {simpleSnapshotLabel(items.at(-1)?.dataTime)}</small></div>;
+  return <div className="history-chart"><div><h4>{title}</h4><strong>{format(items.at(-1)!)}</strong></div><svg viewBox="0 0 300 140" role="img" aria-label={`${title} 변화`}><polyline points={coordinates} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg><small>{historyPointLabel(items[0]?.dataTime, frame)} → {historyPointLabel(items.at(-1)?.dataTime, frame)}</small></div>;
 }
 
 export default function Home() {
@@ -209,6 +240,7 @@ export default function Home() {
   const [profileResult, setProfileResult] = useState<UserProfileResponse | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState("");
+  const [historyFrame, setHistoryFrame] = useState<HistoryFrame>("hour");
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesHasMore, setMatchesHasMore] = useState(false);
@@ -220,6 +252,7 @@ export default function Home() {
   const [modalTab, setModalTab] = useState<"summary" | "squad" | "matches">("summary");
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState("");
+  const [modalHistoryFrame, setModalHistoryFrame] = useState<HistoryFrame>("hour");
   const modalRequest = useRef(0);
   const modalScrollPosition = useRef(0);
   const teamColorNames = teamColors.map((color) => color.name).sort((a, b) => a.localeCompare(b, "ko-KR"));
@@ -334,6 +367,7 @@ export default function Home() {
     setModalMatches([]);
     setModalSelectedMatch(null);
     setModalTab("summary");
+    setModalHistoryFrame("hour");
     setModalError("");
     setModalLoading(true);
     try {
@@ -680,16 +714,17 @@ export default function Home() {
               </dl>
             </div>
 
+            <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={historyFrame} onChange={setHistoryFrame} /></div>
             <div className="history-grid">
-              <HistoryChart title="순위 변화" items={profileResult.history} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} />
-              <HistoryChart title="구단가치 변화" items={profileResult.history} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} />
-              <HistoryChart title="승률 변화" items={profileResult.history} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} />
+              <HistoryChart title="순위 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} />
+              <HistoryChart title="구단가치 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} />
+              <HistoryChart title="승률 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} />
             </div>
 
             <div className="profile-block">
               <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
               {profileResult.squad.length > 0 ? <div className="squad-grid">{profileResult.squad.map((player) => (
-                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><img src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`} alt={`${player.name || "선수"} 액션샷`} onError={(event) => { event.currentTarget.hidden = true; }} /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
+                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><img src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`} alt={`${player.name || "선수"} 액션샷`} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
               ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
             </div>
 
@@ -841,10 +876,11 @@ export default function Home() {
                           <div><dt>ELO</dt><dd>{modalProfile.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
                         </dl>
                       </div>
+                      <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={modalHistoryFrame} onChange={setModalHistoryFrame} /></div>
                       <div className="history-grid">
-                        <HistoryChart title="순위 변화" items={modalProfile.history} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} />
-                        <HistoryChart title="구단가치 변화" items={modalProfile.history} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} />
-                        <HistoryChart title="승률 변화" items={modalProfile.history} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} />
+                        <HistoryChart title="순위 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} />
+                        <HistoryChart title="구단가치 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} />
+                        <HistoryChart title="승률 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} />
                       </div>
                     </div>
                   )}
@@ -852,7 +888,7 @@ export default function Home() {
                     <div className="modal-content-block">
                       <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{modalProfile.squad.length}명</b></div>
                       {modalProfile.squad.length > 0 ? <div className="squad-grid">{modalProfile.squad.map((player) => (
-                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><img src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`} alt={`${player.name || "선수"} 액션샷`} onError={(event) => { event.currentTarget.hidden = true; }} /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
+                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><img src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`} alt={`${player.name || "선수"} 액션샷`} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
                       ))}</div> : <div className="modal-state">저장된 선발 스쿼드가 없습니다.</div>}
                     </div>
                   )}
