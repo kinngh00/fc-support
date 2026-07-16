@@ -348,19 +348,39 @@ function CompactSwitch({ label, checked, onChange, disabled = false, showStateTe
 }
 
 function FormationPitch({ details, fallbackFormation }: { details: SquadProfileDetails; fallbackFormation: string | null }) {
-  const pitchX = (value: number) => Math.max(10, Math.min(90, 50 + (value - 50) * 2.05));
-  const pitchY = (value: number) => Math.max(7, Math.min(88, 6 + value * 1.2));
-  const mobilePositions = new Map<string, { left: number; bottom: number }>();
-  const mobileRows: Array<typeof details.players> = [];
-  for (const player of [...details.players].sort((left, right) => left.y - right.y || left.x - right.x)) {
-    const row = mobileRows.find((items) => Math.abs(items[0].y - player.y) <= 8);
-    if (row) row.push(player); else mobileRows.push([player]);
-  }
-  mobileRows.forEach((players, rowIndex) => {
-    const bottom = mobileRows.length === 1 ? 50 : 4 + rowIndex * (78 / (mobileRows.length - 1));
-    [...players].sort((left, right) => left.x - right.x).forEach((player, playerIndex) => {
-      const left = players.length === 1 ? 50 : 13 + playerIndex * (74 / (players.length - 1));
-      mobilePositions.set(`${player.spid}-${player.position}`, { left, bottom });
+  const horizontalOrder: Record<string, number> = {
+    LWB: 0, LB: 0, LDM: 0, LM: 0, LAM: 0, LW: 0,
+    LF: 1, LS: 1, LCB: 1, LCM: 1,
+    GK: 2, SW: 2, CB: 2, CDM: 2, CM: 2, CAM: 2, CF: 2, ST: 2,
+    RF: 3, RS: 3, RCB: 3, RCM: 3,
+    RWB: 4, RB: 4, RDM: 4, RM: 4, RAM: 4, RW: 4,
+  };
+  const lineForPosition = (position: string | null) => {
+    if (position === "GK") return 0;
+    if (["SW", "LWB", "LB", "LCB", "CB", "RCB", "RB", "RWB"].includes(position || "")) return 1;
+    if (["LDM", "CDM", "RDM", "LM", "LCM", "CM", "RCM", "RM"].includes(position || "")) return 2;
+    if (["LAM", "CAM", "RAM"].includes(position || "")) return 3;
+    return 4;
+  };
+  const lineBottom = [8, 27, 46, 65, 83];
+  const layout = new Map<string, { left: number; bottom: number; rowCount: number }>();
+  const lines = new Map<number, typeof details.players>();
+  details.players.forEach((player) => {
+    const line = lineForPosition(player.position);
+    const players = lines.get(line) || [];
+    players.push(player);
+    lines.set(line, players);
+  });
+  lines.forEach((players, line) => {
+    const ordered = [...players].sort((left, right) => {
+      const leftOrder = horizontalOrder[left.position || ""] ?? 2;
+      const rightOrder = horizontalOrder[right.position || ""] ?? 2;
+      return leftOrder - rightOrder;
+    });
+    const margin = ordered.length >= 5 ? 10 : 13;
+    ordered.forEach((player, index) => {
+      const left = ordered.length === 1 ? 50 : margin + index * ((100 - margin * 2) / (ordered.length - 1));
+      layout.set(`${player.spid}-${player.position}`, { left, bottom: lineBottom[line], rowCount: ordered.length });
     });
   });
   return <div className="formation-view">
@@ -368,16 +388,17 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
     <div className="formation-pitch">
       <div className="pitch-halfway" /><div className="pitch-circle" /><div className="pitch-box pitch-box-top" /><div className="pitch-box pitch-box-bottom" />
       {details.players.map((player) => {
-        const mobilePosition = mobilePositions.get(`${player.spid}-${player.position}`) || { left: 50, bottom: 50 };
+        const position = layout.get(`${player.spid}-${player.position}`) || { left: 50, bottom: 46, rowCount: 1 };
         return (
         <article
           className={`formation-player position-${positionGroup(player.position)}`}
           key={`${player.spid}-${player.position}`}
           style={{
-            left: `${pitchX(player.x)}%`,
-            bottom: `${pitchY(player.y)}%`,
-            "--mobile-player-left": `${mobilePosition.left}%`,
-            "--mobile-player-bottom": `${mobilePosition.bottom}%`,
+            left: `${position.left}%`,
+            bottom: `${position.bottom}%`,
+            "--mobile-player-left": `${position.left}%`,
+            "--mobile-player-bottom": `${position.bottom}%`,
+            "--formation-row-count": position.rowCount,
           } as CSSProperties}
         >
           <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
