@@ -191,15 +191,24 @@ a { color: inherit; text-decoration: none; }
 .history-frame-toggle { background: #deddd5; display: inline-flex; padding: 3px; }
 .history-frame-toggle button { background: transparent; border: 0; color: var(--muted); font-size: 14px; font-weight: 750; min-width: 74px; padding: 9px 11px; }
 .history-frame-toggle button.active { background: var(--ink); color: var(--lime); }
-.history-chart { background: var(--paper); border: 1px solid var(--line); color: var(--green); min-height: 250px; padding: 22px; }
+.history-chart { background: var(--paper); border: 1px solid var(--line); color: var(--green); min-height: 318px; min-width: 0; padding: 22px; }
 .history-chart > div { align-items: start; display: flex; justify-content: space-between; }.history-chart h4 { color: var(--ink); font-size: 17px; margin: 0; }.history-chart strong { color: var(--ink); font-size: 15px; }
-.history-chart-plot { height: 160px; margin-top: 15px; position: relative; }
+.history-chart-scroll { cursor: grab; display: block !important; margin-top: 15px; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-color: var(--green) #deddd5; scrollbar-width: thin; touch-action: pan-y; user-select: none; }
+.history-chart-scroll:active { cursor: grabbing; }
+.history-chart-plot { display: block !important; height: 160px; position: relative; }
 .history-chart-plot svg { display: block; height: 140px; overflow: visible; width: 100%; }
 .history-chart-plot circle { cursor: pointer; outline: none; stroke: var(--paper); stroke-width: 2; transition: r .12s ease, fill .12s ease; }
 .history-chart-plot circle:hover, .history-chart-plot circle:focus, .history-chart-plot circle.active { fill: var(--lime); stroke: var(--green); }
 .history-chart-tooltip { background: var(--ink); color: var(--paper); display: grid; gap: 4px; min-width: 136px; padding: 8px 10px; pointer-events: none; position: absolute; transform: translate(-50%, calc(-100% - 10px)); white-space: nowrap; z-index: 5; }
 .history-chart-tooltip span { color: rgba(244,243,237,.65); font-size: 11px; }
 .history-chart-tooltip b { color: var(--lime); font-family: var(--font-geist-mono); font-size: 13px; }
+.history-chart-change { align-items: center !important; border-top: 1px solid var(--line); display: flex !important; margin-top: 10px; padding-top: 12px; }
+.history-chart-change span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.history-chart-change b { font-family: var(--font-geist-mono); font-size: 13px; }
+.history-chart-change.trend-up b { color: var(--green); }
+.history-chart-change.trend-down b { color: #a45648; }
+.history-chart-change.trend-same b { color: var(--muted); }
+.history-chart-guide { color: var(--muted); display: block; font-size: 10px; margin-top: 7px; }
 .history-chart.empty { color: var(--muted); }.history-chart.empty p { font-size: 13px; line-height: 1.6; margin-top: 55px; }
 .profile-block { background: var(--paper); border: 1px solid var(--line); padding: 28px; }
 .profile-block-heading { align-items: end; border-bottom: 1px solid var(--ink); display: flex; justify-content: space-between; margin-bottom: 22px; padding-bottom: 18px; }.profile-block-heading span { color: var(--green); font-family: var(--font-geist-mono); font-size: 12px; font-weight: 800; letter-spacing: .1em; }.profile-block-heading h3 { font-size: 27px; margin: 7px 0 0; }.profile-block-heading > b { font-size: 14px; }

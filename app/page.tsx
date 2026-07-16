@@ -57,6 +57,7 @@ type RankingResponse = {
 
 type HistoryItem = { dataTime: string; rank: number; clubValue: string; winRate: number | null };
 type HistoryFrame = "hour" | "day" | "week";
+type HistoryChange = { label: string; trend: "up" | "down" | "same" };
 type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null; seasonImage: string | null };
 type UserProfileResponse = {
   snapshot: { id: number; data_time: string };
@@ -137,6 +138,38 @@ function clubValueLabel(value: string | null) {
   const jo = (amount % 10_000_000_000_000_000n) / 1_000_000_000_000n;
   if (gyeong > 0n) return `${gyeong.toLocaleString()}경 ${jo.toLocaleString()}조`;
   return `${(amount / 1_000_000_000_000n).toLocaleString()}조`;
+}
+
+function clubValueChangeLabel(amount: bigint) {
+  const absolute = amount < 0n ? -amount : amount;
+  const gyeong = absolute / 10_000_000_000_000_000n;
+  const jo = (absolute % 10_000_000_000_000_000n) / 1_000_000_000_000n;
+  const eok = (absolute % 1_000_000_000_000n) / 100_000_000n;
+  if (gyeong > 0n) return `${gyeong.toLocaleString()}경 ${jo.toLocaleString()}조`;
+  if (jo > 0n) return `${jo.toLocaleString()}조 ${eok.toLocaleString()}억`;
+  if (eok > 0n) return `${eok.toLocaleString()}억`;
+  return absolute.toLocaleString("ko-KR");
+}
+
+function rankHistoryChange(first: HistoryItem, last: HistoryItem): HistoryChange {
+  const difference = first.rank - last.rank;
+  if (difference > 0) return { label: `${difference.toLocaleString()}등 상승`, trend: "up" };
+  if (difference < 0) return { label: `${Math.abs(difference).toLocaleString()}등 하락`, trend: "down" };
+  return { label: "순위 변동 없음", trend: "same" };
+}
+
+function clubValueHistoryChange(first: HistoryItem, last: HistoryItem): HistoryChange {
+  const difference = BigInt(last.clubValue) - BigInt(first.clubValue);
+  if (difference > 0n) return { label: `${clubValueChangeLabel(difference)} 상승`, trend: "up" };
+  if (difference < 0n) return { label: `${clubValueChangeLabel(difference)} 하락`, trend: "down" };
+  return { label: "구단가치 변동 없음", trend: "same" };
+}
+
+function winRateHistoryChange(first: HistoryItem, last: HistoryItem): HistoryChange {
+  const difference = Number(((last.winRate ?? 0) - (first.winRate ?? 0)).toFixed(1));
+  if (difference > 0) return { label: `${difference.toFixed(1)}%p 상승`, trend: "up" };
+  if (difference < 0) return { label: `${Math.abs(difference).toFixed(1)}%p 하락`, trend: "down" };
+  return { label: "승률 변동 없음", trend: "same" };
 }
 
 function paginationItems(current: number, total: number) {
@@ -228,56 +261,100 @@ function SeasonBadge({ season, image }: { season: string | null; image: string |
   );
 }
 
-function HistoryChart({ title, items, value, format, frame }: {
-  title: string; items: HistoryItem[]; value: (item: HistoryItem) => number | null; format: (item: HistoryItem) => string; frame: HistoryFrame;
+function HistoryChart({ title, items, value, format, frame, change }: {
+  title: string;
+  items: HistoryItem[];
+  value: (item: HistoryItem) => number | null;
+  format: (item: HistoryItem) => string;
+  frame: HistoryFrame;
+  change: (first: HistoryItem, last: HistoryItem) => HistoryChange;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ active: false, moved: false, startX: 0, startLeft: 0 });
   const chartItems = items.map((item) => ({ item, point: value(item) }))
     .filter((entry): entry is { item: HistoryItem; point: number } => entry.point != null && Number.isFinite(entry.point));
   const points = chartItems.map((entry) => entry.point);
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+  }, [items, frame]);
   if (points.length < 2) return <div className="history-chart empty"><h4>{title}</h4><p>변화를 보여줄 기록이 아직 부족합니다.</p></div>;
   const min = Math.min(...points);
   const max = Math.max(...points);
+  const plotWidth = Math.max(300, 16 + (points.length - 1) * 56);
   const coordinates = chartItems.map(({ point }, index) => {
-    const x = 8 + (index / Math.max(points.length - 1, 1)) * 284;
+    const x = 8 + (index / Math.max(points.length - 1, 1)) * (plotWidth - 16);
     const y = max === min ? 70 : 130 - ((point - min) / (max - min)) * 110;
     return { x, y };
   });
   const active = activeIndex == null ? null : chartItems[activeIndex];
   const activeCoordinate = activeIndex == null ? null : coordinates[activeIndex];
   const line = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
+  const changeResult = change(chartItems[0].item, chartItems.at(-1)!.item);
+  const finishDrag = (element: HTMLDivElement, pointerId: number) => {
+    dragRef.current.active = false;
+    if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+  };
   return <div className="history-chart" data-frame={frame}>
     <div><h4>{title}</h4><strong>{format(chartItems.at(-1)!.item)}</strong></div>
-    <div className="history-chart-plot" onMouseLeave={() => setActiveIndex(null)}>
-      <svg viewBox="0 0 300 140" role="img" aria-label={`${title} 변화`}>
-        <polyline points={line} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
-        {coordinates.map(({ x, y }, index) => {
-          const label = `${historyTooltipLabel(chartItems[index].item.dataTime)}, ${format(chartItems[index].item)}`;
-          return <circle
-            className={activeIndex === index ? "active" : ""}
-            cx={x}
-            cy={y}
-            fill="currentColor"
-            key={`${chartItems[index].item.dataTime}-${index}`}
-            onBlur={() => setActiveIndex(null)}
-            onClick={() => setActiveIndex(index)}
-            onFocus={() => setActiveIndex(index)}
-            onMouseEnter={() => setActiveIndex(index)}
-            r={activeIndex === index ? 5 : 3.5}
-            role="button"
-            tabIndex={0}
-            aria-label={label}
-          />;
-        })}
-      </svg>
-      {active && activeCoordinate && <div
-        className="history-chart-tooltip"
-        style={{
-          left: `${Math.min(86, Math.max(14, (activeCoordinate.x / 300) * 100))}%`,
-          top: `${(activeCoordinate.y / 140) * 100}%`,
-        }}
-      ><span>{historyTooltipLabel(active.item.dataTime)}</span><b>{format(active.item)}</b></div>}
+    <div
+      className="history-chart-scroll"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        dragRef.current = { active: true, moved: false, startX: event.clientX, startLeft: event.currentTarget.scrollLeft };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        if (!dragRef.current.active) return;
+        const distance = event.clientX - dragRef.current.startX;
+        if (Math.abs(distance) > 3) dragRef.current.moved = true;
+        event.currentTarget.scrollLeft = dragRef.current.startLeft - distance;
+      }}
+      onPointerUp={(event) => finishDrag(event.currentTarget, event.pointerId)}
+      onPointerCancel={(event) => finishDrag(event.currentTarget, event.pointerId)}
+      onWheel={(event) => {
+        event.preventDefault();
+        event.currentTarget.scrollLeft += Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+      }}
+      ref={scrollRef}
+      role="region"
+      aria-label={`${title} 이전 기록 탐색`}
+      tabIndex={0}
+    >
+      <div className="history-chart-plot" onMouseLeave={() => setActiveIndex(null)} style={{ width: `${plotWidth}px` }}>
+        <svg viewBox={`0 0 ${plotWidth} 140`} role="img" aria-label={`${title} 변화`} style={{ width: `${plotWidth}px` }}>
+          <polyline points={line} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+          {coordinates.map(({ x, y }, index) => {
+            const label = `${historyTooltipLabel(chartItems[index].item.dataTime)}, ${format(chartItems[index].item)}`;
+            return <circle
+              className={activeIndex === index ? "active" : ""}
+              cx={x}
+              cy={y}
+              fill="currentColor"
+              key={`${chartItems[index].item.dataTime}-${index}`}
+              onBlur={() => setActiveIndex(null)}
+              onClick={() => { if (!dragRef.current.moved) setActiveIndex(index); }}
+              onFocus={() => setActiveIndex(index)}
+              onMouseEnter={() => { if (!dragRef.current.active) setActiveIndex(index); }}
+              r={activeIndex === index ? 5 : 3.5}
+              role="button"
+              tabIndex={0}
+              aria-label={label}
+            />;
+          })}
+        </svg>
+        {active && activeCoordinate && <div
+          className="history-chart-tooltip"
+          style={{
+            left: `${Math.min(plotWidth - 72, Math.max(72, activeCoordinate.x))}px`,
+            top: `${(activeCoordinate.y / 140) * 100}%`,
+          }}
+        ><span>{historyTooltipLabel(active.item.dataTime)}</span><b>{format(active.item)}</b></div>}
+      </div>
     </div>
+    <div className={`history-chart-change trend-${changeResult.trend}`}><span>{title}</span><b>{changeResult.label}</b></div>
+    <small className="history-chart-guide">좌우로 드래그하거나 휠로 이전 기록 보기</small>
   </div>;
 }
 
@@ -774,9 +851,9 @@ export default function Home() {
 
             <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={historyFrame} onChange={setHistoryFrame} /></div>
             <div className="history-grid">
-              <HistoryChart title="순위 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} />
-              <HistoryChart title="구단가치 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} />
-              <HistoryChart title="승률 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} />
+              <HistoryChart title="순위 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} change={rankHistoryChange} />
+              <HistoryChart title="구단가치 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} change={clubValueHistoryChange} />
+              <HistoryChart title="승률 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} change={winRateHistoryChange} />
             </div>
 
             <div className="profile-block">
@@ -936,9 +1013,9 @@ export default function Home() {
                       </div>
                       <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={modalHistoryFrame} onChange={setModalHistoryFrame} /></div>
                       <div className="history-grid">
-                        <HistoryChart title="순위 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} />
-                        <HistoryChart title="구단가치 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} />
-                        <HistoryChart title="승률 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} />
+                        <HistoryChart title="순위 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} change={rankHistoryChange} />
+                        <HistoryChart title="구단가치 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} change={clubValueHistoryChange} />
+                        <HistoryChart title="승률 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} change={winRateHistoryChange} />
                       </div>
                     </div>
                   )}
