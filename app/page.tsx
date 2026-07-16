@@ -199,6 +199,20 @@ function HistoryFrameToggle({ value, onChange }: { value: HistoryFrame; onChange
   </div>;
 }
 
+function PlayerImage({ spid, name, wrapperClassName = "", preserveSpace = false }: {
+  spid: string; name: string; wrapperClassName?: string; preserveSpace?: boolean;
+}) {
+  const [source, setSource] = useState<"player" | "action" | "missing">("player");
+  const image = source === "player"
+    ? `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${spid}.png`
+    : `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`;
+  const content = source === "missing"
+    ? (preserveSpace ? <span className="squad-player-image-missing" aria-label={`${name} 이미지 없음`} /> : null)
+    : <img alt={`${name} 선수 이미지`} src={image} onError={() => setSource((current) => current === "player" ? "action" : "missing")} />;
+  if (wrapperClassName) return <div className={`${wrapperClassName} ${source === "missing" ? "missing" : ""}`}>{content}</div>;
+  return content;
+}
+
 function HistoryChart({ title, items, value, format, frame }: {
   title: string; items: HistoryItem[]; value: (item: HistoryItem) => number | null; format: (item: HistoryItem) => string; frame: HistoryFrame;
 }) {
@@ -659,16 +673,7 @@ export default function Home() {
                   {result.items.map((player, index) => (
                     <article className="player-row" key={`${player.spid}-${player.grade}`}>
                       <span className="list-rank">{String(index + 1).padStart(2, "0")}</span>
-                      <div className="player-photo">
-                        <img
-                          alt={`${player.name || "선수"} 액션샷`}
-                          src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`}
-                          onError={(event) => {
-                            event.currentTarget.hidden = true;
-                            event.currentTarget.parentElement?.classList.add("missing");
-                          }}
-                        />
-                      </div>
+                      <PlayerImage spid={player.spid} name={player.name || "선수"} wrapperClassName="player-photo" />
                       <div className="player-identity">
                         <div><span className={`season season-${seasonLabel(player.season).toLowerCase()}`}>{seasonLabel(player.season)}</span><b>+{player.grade}</b></div>
                         <h4>{player.name || "선수명 정보 없음"}</h4><small>SPID {player.spid}</small>
@@ -724,7 +729,7 @@ export default function Home() {
             <div className="profile-block">
               <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
               {profileResult.squad.length > 0 ? <div className="squad-grid">{profileResult.squad.map((player) => (
-                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><img src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`} alt={`${player.name || "선수"} 액션샷`} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
+                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
               ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
             </div>
 
@@ -888,7 +893,7 @@ export default function Home() {
                     <div className="modal-content-block">
                       <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{modalProfile.squad.length}명</b></div>
                       {modalProfile.squad.length > 0 ? <div className="squad-grid">{modalProfile.squad.map((player) => (
-                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><img src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`} alt={`${player.name || "선수"} 액션샷`} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
+                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small>{seasonLabel(player.season)} · +{player.grade}</small></div></article>
                       ))}</div> : <div className="modal-state">저장된 선발 스쿼드가 없습니다.</div>}
                     </div>
                   )}
