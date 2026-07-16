@@ -181,8 +181,14 @@ a { color: inherit; text-decoration: none; }
 .ranking-heading .section-kicker { color: var(--lime); }
 .ranking-heading h2 { font-size: clamp(38px, 4.4vw, 66px); letter-spacing: -.065em; line-height: 1; margin: 0; }
 .ranking-description { color: rgba(244,243,237,.62); font-size: 15px; margin: 18px 0 0; }
+.ranking-controls { display: grid; gap: 20px; min-width: 320px; }
+.ranking-search > label, .ranking-filter > span { color: rgba(244,243,237,.58); display: block; font-size: 12px; font-weight: 700; letter-spacing: .08em; margin-bottom: 9px; }
+.ranking-search > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.ranking-search input { background: transparent; border: 1px solid rgba(244,243,237,.35); border-right: 0; color: var(--paper); font-size: 15px; min-width: 0; outline: none; padding: 11px 12px; }
+.ranking-search input::placeholder { color: rgba(244,243,237,.35); }
+.ranking-search input:focus { border-color: var(--lime); }
+.ranking-search button { background: var(--lime); border: 0; color: var(--ink); font-size: 13px; font-weight: 800; padding: 0 18px; }
 .ranking-filter { min-width: 280px; }
-.ranking-filter > span { color: rgba(244,243,237,.58); display: block; font-size: 12px; font-weight: 700; letter-spacing: .08em; margin-bottom: 9px; }
 .ranking-filter select { appearance: none; background: transparent; border: 0; border-bottom: 1px solid rgba(244,243,237,.35); color: var(--paper); font-size: 16px; font-weight: 650; outline: none; padding: 11px 28px 11px 0; width: 100%; }
 .ranking-filter select option { background: var(--ink); }
 .ranking-board { background: var(--paper); color: var(--ink); overflow-x: auto; }
@@ -236,7 +242,7 @@ footer p { color: rgba(244,243,237,.65); font-size: 11px; margin: 0; } footer sm
   .results-layout { grid-template-columns: 1fr; }.position-panel { border-bottom: 1px solid var(--line); border-right: 0; }.position-grid { grid-template-columns: repeat(7, 1fr); }
   .player-row { grid-template-columns: 34px 64px 1fr; padding-right: 0; }.pick-meter { grid-column: 3; padding: 0 0 18px 18px; }
   .community-section { gap: 50px; grid-template-columns: 1fr; }.community-copy { border-left: 0; padding-left: 0; }
-  .ranking-heading { align-items: start; flex-direction: column; gap: 28px; }.ranking-filter { width: 100%; }
+  .ranking-heading { align-items: start; flex-direction: column; gap: 28px; }.ranking-controls, .ranking-filter { width: 100%; }
   .ranking-board { overflow-x: visible; }
   .ranking-board-meta { min-width: 0; }
   .ranking-table-head { display: none; }
@@ -295,6 +301,7 @@ footer p { color: rgba(244,243,237,.65); font-size: 11px; margin: 0; } footer sm
   .player-row { grid-template-columns: 26px 56px 1fr; min-height: 128px; }.player-photo { height: 88px; width: 56px; }.player-identity { padding-left: 12px; }.player-identity h4 { font-size: 18px; }.pick-meter { grid-column: 2 / 4; padding-left: 0; }
   .ranking-strip { gap: 10px 14px; grid-template-columns: auto 1fr; }.ranking-strip span { grid-column: 1 / -1; width: 100%; }.ranking-strip p:last-child { grid-column: 1 / -1; }
   .ranking-section { padding-bottom: 80px; padding-top: 80px; }.ranking-board { margin-left: -24px; margin-right: -24px; }
+  .ranking-controls { min-width: 0; }
   .ranking-row { gap: 18px 14px; grid-template-columns: 56px minmax(0, 1fr); padding: 22px 18px; }
   .ranking-number { grid-column: 1; grid-row: 1 / span 6; }
   .ranking-coach, .ranking-team, .ranking-formation, .ranking-elo, .ranking-record, .ranking-value { grid-column: 2; }

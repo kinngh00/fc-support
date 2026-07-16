@@ -134,10 +134,21 @@ export default function Home() {
   const [rankingLoading, setRankingLoading] = useState(true);
   const [rankingError, setRankingError] = useState("");
   const [rankingPage, setRankingPage] = useState(1);
+  const [rankingNickname, setRankingNickname] = useState("");
+  const [rankingSearchActive, setRankingSearchActive] = useState(false);
+  const [rankingSearchLabel, setRankingSearchLabel] = useState("");
 
-  async function fetchRankings(nextTeam = "", page = 1) {
+  function scrollToRankingTop() {
+    window.requestAnimationFrame(() => {
+      document.getElementById("ranking")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  async function fetchRankings(nextTeam = "", page = 1, shouldScroll = false) {
     setRankingLoading(true);
     setRankingError("");
+    setRankingSearchActive(false);
+    setRankingSearchLabel("");
     const parameters = new URLSearchParams({
       rankStart: "1",
       rankEnd: "10000",
@@ -151,9 +162,37 @@ export default function Home() {
       if (!response.ok) throw new Error(payload.message || "랭킹을 불러오지 못했습니다.");
       setRankingResult(payload);
       setRankingPage(page);
+      if (shouldScroll) scrollToRankingTop();
     } catch (requestError) {
       setRankingResult(null);
       setRankingError(requestError instanceof Error ? requestError.message : "랭킹을 불러오지 못했습니다.");
+    } finally {
+      setRankingLoading(false);
+    }
+  }
+
+  async function searchRanking(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nickname = rankingNickname.trim();
+    if (!nickname) {
+      await fetchRankings(rankingTeam, 1, true);
+      return;
+    }
+    setRankingLoading(true);
+    setRankingError("");
+    try {
+      const parameters = new URLSearchParams({ nickname });
+      const response = await fetch(`${apiBaseUrl}/api/rankings/search?${parameters}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "구단주 검색에 실패했습니다.");
+      setRankingResult(payload);
+      setRankingPage(1);
+      setRankingSearchActive(true);
+      setRankingSearchLabel(nickname);
+      scrollToRankingTop();
+    } catch (requestError) {
+      setRankingResult(null);
+      setRankingError(requestError instanceof Error ? requestError.message : "구단주 검색에 실패했습니다.");
     } finally {
       setRankingLoading(false);
     }
@@ -444,25 +483,32 @@ export default function Home() {
             <h2>감독모드 랭킹</h2>
             <p className="ranking-description">활성 스냅샷의 1위부터 10,000위까지 실제 랭킹입니다.</p>
           </div>
-          <label className="ranking-filter">
-            <span>팀컬러 필터</span>
-            <select
-              value={rankingTeam}
-              onChange={(event) => {
-                const nextTeam = event.target.value;
-                setRankingTeam(nextTeam);
-                void fetchRankings(nextTeam, 1);
-              }}
-            >
-              <option value="">전체 팀</option>
-              {teamColors.map((color) => <option value={color.name} key={color.name}>{color.name} · {color.managers.toLocaleString()}명</option>)}
-            </select>
-          </label>
+          <div className="ranking-controls">
+            <form className="ranking-search" onSubmit={searchRanking}>
+              <label htmlFor="ranking-nickname">구단주 닉네임 검색</label>
+              <div><input id="ranking-nickname" value={rankingNickname} onChange={(event) => setRankingNickname(event.target.value)} placeholder="닉네임 입력" /><button type="submit">검색</button></div>
+            </form>
+            <label className="ranking-filter">
+              <span>팀컬러 필터</span>
+              <select
+                value={rankingTeam}
+                onChange={(event) => {
+                  const nextTeam = event.target.value;
+                  setRankingTeam(nextTeam);
+                  setRankingNickname("");
+                  void fetchRankings(nextTeam, 1);
+                }}
+              >
+                <option value="">전체 팀</option>
+                {teamColors.map((color) => <option value={color.name} key={color.name}>{color.name} · {color.managers.toLocaleString()}명</option>)}
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="ranking-board">
           <div className="ranking-board-meta">
-            <span>{rankingTeam || "ALL TEAM COLORS"}</span>
+            <span>{rankingSearchActive ? `NICKNAME · ${rankingSearchLabel}` : rankingTeam || "ALL TEAM COLORS"}</span>
             <p>{rankingResult ? `${rankingResult.total.toLocaleString()}명` : "데이터 없음"} · {snapshotLabel(rankingResult?.snapshot.data_time)}</p>
           </div>
           <div className="ranking-table-head" aria-hidden="true">
@@ -497,9 +543,9 @@ export default function Home() {
             <div className="ranking-empty">조건에 맞는 실제 랭킹 데이터가 없습니다.</div>
           )}
 
-          {rankingResult && rankingResult.total > 0 && (
+          {!rankingSearchActive && rankingResult && rankingResult.total > 0 && (
             <nav className="ranking-pagination" aria-label="랭킹 페이지">
-              <button type="button" disabled={rankingLoading || rankingPage === 1} onClick={() => void fetchRankings(rankingTeam, rankingPage - 1)}>이전</button>
+              <button type="button" disabled={rankingLoading || rankingPage === 1} onClick={() => void fetchRankings(rankingTeam, rankingPage - 1, true)}>이전</button>
               <div>
                 {paginationItems(rankingPage, Math.ceil(rankingResult.total / 20)).map((item, index) =>
                   item === "ellipsis" ? <span key={`ellipsis-${index}`}>···</span> : (
@@ -509,12 +555,12 @@ export default function Home() {
                       key={item}
                       disabled={rankingLoading}
                       aria-current={rankingPage === item ? "page" : undefined}
-                      onClick={() => void fetchRankings(rankingTeam, item)}
+                      onClick={() => void fetchRankings(rankingTeam, item, true)}
                     >{item}</button>
                   ),
                 )}
               </div>
-              <button type="button" disabled={rankingLoading || rankingPage === Math.ceil(rankingResult.total / 20)} onClick={() => void fetchRankings(rankingTeam, rankingPage + 1)}>다음</button>
+              <button type="button" disabled={rankingLoading || rankingPage === Math.ceil(rankingResult.total / 20)} onClick={() => void fetchRankings(rankingTeam, rankingPage + 1, true)}>다음</button>
             </nav>
           )}
         </div>

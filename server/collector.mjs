@@ -8,6 +8,7 @@ import {
   updateSnapshot,
 } from "./database.mjs";
 import { fetchAllRankings } from "./ranking-source.mjs";
+import { expectedKstDataTime } from "./freshness.mjs";
 import { logger } from "./logger.mjs";
 import {
   latestManagerMatchPath,
@@ -29,12 +30,34 @@ function progressLogger(component, unit, step = 500) {
   };
 }
 
-function nexonDataTime(now = new Date()) {
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  kst.setUTCMinutes(0, 0, 0);
-  kst.setUTCHours(kst.getUTCHours() - 2);
-  const label = kst.toISOString().slice(0, 13);
-  return `${label}:00:00+09:00`;
+async function fetchConsistentRankings() {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const rankings = await fetchAllRankings(
+        config.rankingConcurrency,
+        progressLogger("랭킹", "랭킹 페이지 조회", 50),
+      );
+      const seen = new Map();
+      for (const ranking of rankings) {
+        const previous = seen.get(ranking.nexonSn);
+        if (previous) {
+          throw new Error(`Ranking identity duplicated at ranks ${previous.rank} and ${ranking.rank}.`);
+        }
+        seen.set(ranking.nexonSn, ranking);
+      }
+      return rankings;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) break;
+      logger.warn("랭킹", "페이지 조회 중 순위 갱신이 겹쳐 전체 랭킹을 다시 조회합니다.", {
+        attempt,
+        error: String(error?.message || error),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
+  throw lastError;
 }
 
 async function refreshMetadata() {
@@ -332,7 +355,7 @@ async function collectLatestMatches(snapshotId, keys) {
 
 async function performCollection() {
   const keys = requireApiKeys();
-  const dataTime = nexonDataTime();
+  const dataTime = expectedKstDataTime();
   const snapshotId = createSnapshot(dataTime);
   logger.info("수집기", "새 스냅샷 집계를 시작합니다.", {
     snapshotId,
@@ -345,10 +368,7 @@ async function performCollection() {
     await refreshMetadata();
 
     updateSnapshot(snapshotId, { stage: "ranking" });
-    const rankings = await fetchAllRankings(
-      config.rankingConcurrency,
-      progressLogger("랭킹", "랭킹 페이지 조회", 50),
-    );
+    const rankings = await fetchConsistentRankings();
     storeRankings(snapshotId, rankings);
     updateSnapshot(snapshotId, { ranking_count: rankings.length, stage: "ouid" });
 

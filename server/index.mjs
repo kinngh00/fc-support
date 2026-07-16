@@ -1,10 +1,11 @@
 import http from "node:http";
 import { config } from "./config.mjs";
 import { isCollectionRunning, runCollection } from "./collector.mjs";
-import { getActiveSnapshot } from "./database.mjs";
-import { getPickRates, listAvailablePositions, listRankings, listTeamColors, recentSnapshots } from "./queries.mjs";
+import { failAbandonedSnapshots, getActiveSnapshot } from "./database.mjs";
+import { getPickRates, listAvailablePositions, listRankings, listTeamColors, recentSnapshots, searchRankings } from "./queries.mjs";
 import { startScheduler } from "./scheduler.mjs";
 import { listLogs, logger } from "./logger.mjs";
+import { inspectSnapshotFreshness } from "./freshness.mjs";
 
 function send(response, status, payload) {
   response.writeHead(status, {
@@ -33,10 +34,12 @@ const server = http.createServer(async (request, response) => {
 
   try {
     if (request.method === "GET" && url.pathname === "/api/health") {
+      const activeSnapshot = getActiveSnapshot();
       return send(response, 200, {
         ok: true,
         collectionRunning: isCollectionRunning(),
-        activeSnapshot: getActiveSnapshot(),
+        activeSnapshot,
+        freshness: inspectSnapshotFreshness(activeSnapshot),
         schedulerEnabled: config.schedulerEnabled,
         configuredApiKeyCount: config.nexonApiKeys.length,
       });
@@ -71,6 +74,15 @@ const server = http.createServer(async (request, response) => {
         limit,
         hasMore: offset + result.items.length < result.total,
       });
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/rankings/search") {
+      const nickname = (url.searchParams.get("nickname") || "").trim();
+      if (!nickname) throw new Error("nickname is required.");
+      if (nickname.length > 50) throw new Error("nickname must be 50 characters or fewer.");
+      const result = searchRankings({ nickname, limit: 20 });
+      if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
+      return send(response, 200, { ...result, offset: 0, limit: 20, hasMore: result.total > result.items.length });
     }
 
     if (request.method === "GET" && url.pathname === "/api/pick-rates") {
@@ -123,8 +135,13 @@ const server = http.createServer(async (request, response) => {
 
 server.listen(config.port, config.host, () => {
   logger.success("서버", "백엔드 서버가 시작되었습니다.", { url: `http://${config.host}:${config.port}` });
+  const abandonedCount = failAbandonedSnapshots();
+  if (abandonedCount > 0) {
+    logger.warn("수집 복구", "이전 서버 종료로 미완료된 스냅샷을 실패 처리했습니다.", { count: abandonedCount });
+  }
   startScheduler();
-  if (config.collectOnEmpty && !getActiveSnapshot()) {
+  const activeSnapshot = getActiveSnapshot();
+  if (config.collectOnEmpty && !activeSnapshot) {
     if (config.nexonApiKeys.length === 0) {
       logger.warn("초기 집계", "DB가 비어 있지만 API 키가 없어 즉시 집계를 시작하지 못했습니다.");
     } else {
@@ -133,8 +150,26 @@ server.listen(config.port, config.host, () => {
         logger.error("초기 집계", "서버 시작 직후 집계가 실패했습니다.", { error: String(error?.message || error) });
       });
     }
-  } else if (getActiveSnapshot()) {
-    logger.info("초기 집계", "기존 활성 스냅샷을 확인했습니다. 즉시 집계를 건너뜁니다.", { snapshotId: getActiveSnapshot().id });
+  } else if (activeSnapshot) {
+    const freshness = inspectSnapshotFreshness(activeSnapshot);
+    if (!freshness.fresh && config.nexonApiKeys.length > 0) {
+      logger.warn("신선도 검사", "활성 스냅샷이 최신 기대 시각보다 오래되어 즉시 재집계를 시작합니다.", {
+        snapshotId: activeSnapshot.id,
+        snapshotDataTime: freshness.snapshotDataTime,
+        expectedDataTime: freshness.expectedDataTime,
+      });
+      runCollection().catch((error) => {
+        logger.error("신선도 검사", "오래된 스냅샷의 재집계가 실패했습니다.", { error: String(error?.message || error) });
+      });
+    } else if (!freshness.fresh) {
+      logger.warn("신선도 검사", "활성 스냅샷이 오래됐지만 API 키가 없어 재집계를 시작하지 못했습니다.", freshness);
+    } else {
+      logger.info("신선도 검사", "활성 스냅샷이 최신 상태입니다.", {
+        snapshotId: activeSnapshot.id,
+        snapshotDataTime: freshness.snapshotDataTime,
+        expectedDataTime: freshness.expectedDataTime,
+      });
+    }
   }
 });
 

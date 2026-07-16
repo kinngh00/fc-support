@@ -181,6 +181,16 @@ export function failSnapshot(id, error) {
   `).run(new Date().toISOString(), String(error?.message || error).slice(0, 2000), id);
 }
 
+export function failAbandonedSnapshots() {
+  const result = db.prepare(`
+    UPDATE snapshots
+    SET status = 'failed', stage = 'failed', completed_at = ?,
+        error_message = 'Backend stopped before collection completed.'
+    WHERE status = 'building'
+  `).run(new Date().toISOString());
+  return Number(result.changes);
+}
+
 export function promoteSnapshot(id) {
   transaction(() => {
     const current = getActiveSnapshot();

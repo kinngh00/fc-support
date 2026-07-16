@@ -1,5 +1,29 @@
 import { db, getActiveSnapshot } from "./database.mjs";
 
+function rankingItem(row) {
+  return {
+    rank: Number(row.rank),
+    nickname: row.nickname,
+    nexonSn: row.nexon_sn,
+    level: row.level == null ? null : Number(row.level),
+    clubValue: row.club_value,
+    elo: row.elo == null ? null : Number(row.elo),
+    winRate: row.win_rate == null ? null : Number(row.win_rate),
+    wins: row.wins == null ? null : Number(row.wins),
+    draws: row.draws == null ? null : Number(row.draws),
+    losses: row.losses == null ? null : Number(row.losses),
+    teamColors: JSON.parse(row.team_colors_json || "[]"),
+    primaryTeamColor: row.primary_team_color,
+    teamImage: row.team_image,
+    teamColorCount: row.team_color_count == null ? null : Number(row.team_color_count),
+    formation: row.formation,
+    currentGrade: row.current_grade,
+    bestGrade: row.best_grade,
+    previousGrade: row.previous_grade,
+    lineupStatus: row.lineup_status,
+  };
+}
+
 export function listTeamColors() {
   const snapshot = getActiveSnapshot();
   if (!snapshot) return { snapshot: null, items: [] };
@@ -155,26 +179,39 @@ export function listRankings({ rankStart, rankEnd, teamColor, offset, limit }) {
   return {
     snapshot,
     total,
-    items: rows.map((row) => ({
-      rank: Number(row.rank),
-      nickname: row.nickname,
-      nexonSn: row.nexon_sn,
-      level: row.level == null ? null : Number(row.level),
-      clubValue: row.club_value,
-      elo: row.elo == null ? null : Number(row.elo),
-      winRate: row.win_rate == null ? null : Number(row.win_rate),
-      wins: row.wins == null ? null : Number(row.wins),
-      draws: row.draws == null ? null : Number(row.draws),
-      losses: row.losses == null ? null : Number(row.losses),
-      teamColors: JSON.parse(row.team_colors_json || "[]"),
-      primaryTeamColor: row.primary_team_color,
-      teamImage: row.team_image,
-      teamColorCount: row.team_color_count == null ? null : Number(row.team_color_count),
-      formation: row.formation,
-      currentGrade: row.current_grade,
-      bestGrade: row.best_grade,
-      previousGrade: row.previous_grade,
-      lineupStatus: row.lineup_status,
-    })),
+    items: rows.map(rankingItem),
   };
+}
+
+export function searchRankings({ nickname, limit = 20 }) {
+  const snapshot = getActiveSnapshot();
+  if (!snapshot) return null;
+  const escaped = nickname.replace(/[\\%_]/g, "\\$&");
+  const pattern = `%${escaped}%`;
+
+  const total = Number(db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM ranking_entries e
+    JOIN rankers r ON r.id = e.ranker_id
+    WHERE e.snapshot_id = ? AND r.nickname LIKE ? ESCAPE '\\' COLLATE NOCASE
+  `).get(snapshot.id, pattern).count);
+
+  const rows = db.prepare(`
+    SELECT
+      e.rank, r.nickname, r.nexon_sn, e.level,
+      CAST(e.club_value AS TEXT) AS club_value,
+      e.elo, e.win_rate, e.wins, e.draws, e.losses,
+      e.team_colors_json, e.primary_team_color, e.team_color_count,
+      e.formation, e.current_grade, e.best_grade, e.previous_grade,
+      asset.image_url AS team_image,
+      e.lineup_status
+    FROM ranking_entries e
+    JOIN rankers r ON r.id = e.ranker_id
+    LEFT JOIN team_color_assets asset ON asset.name = e.primary_team_color
+    WHERE e.snapshot_id = ? AND r.nickname LIKE ? ESCAPE '\\' COLLATE NOCASE
+    ORDER BY CASE WHEN r.nickname = ? COLLATE NOCASE THEN 0 ELSE 1 END, e.rank ASC
+    LIMIT ?
+  `).all(snapshot.id, pattern, nickname, limit);
+
+  return { snapshot, total, items: rows.map(rankingItem) };
 }
