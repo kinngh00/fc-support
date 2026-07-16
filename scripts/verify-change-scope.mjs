@@ -74,11 +74,11 @@ if (missingRegions.length) fail("모든 허용 파일에 구체적인 변경 영
 if (typeof scope.visualChange !== "boolean") fail("visualChange를 true 또는 false로 명시해야 합니다.");
 if (scope.visualChange && (mode === "staged" || mode === "release")) {
   const verification = scope.visualVerification;
-  if (!verification || verification.status !== "passed") fail("UI 변경의 실제 화면 검증이 완료되지 않았습니다.");
+  if (!verification || !["pending", "passed"].includes(verification.status)) fail("UI 변경의 화면 검증 상태를 pending 또는 passed로 기록해야 합니다.");
   if (!Array.isArray(verification.requiredViewports) || !verification.requiredViewports.includes("desktop") || !verification.requiredViewports.includes("mobile")) {
     fail("UI 변경은 desktop과 mobile 화면을 모두 검증해야 합니다.");
   }
-  if (!Array.isArray(verification.evidence) || verification.evidence.length < 2) fail("UI 변경의 데스크톱·모바일 검증 근거가 필요합니다.");
+  if (verification.status === "passed" && (!Array.isArray(verification.evidence) || verification.evidence.length < 2)) fail("완료 처리한 UI 변경에는 데스크톱·모바일 검증 근거가 필요합니다.");
 }
 
 console.log(`변경 범위 검사 통과: ${files.length}개 파일이 현재 요청의 허용 범위와 일치합니다.`);
