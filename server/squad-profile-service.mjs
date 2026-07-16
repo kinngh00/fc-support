@@ -75,6 +75,7 @@ function normalizePayload(payload) {
       position: plainText(player.role || player.position).toUpperCase() || null,
       grade: Number(player.buildUp || 0),
       season: plainText(player.season) || null,
+      seasonImage: null,
       x: Math.max(0, Math.min(100, Number(player.x))),
       y: Math.max(0, Math.min(100, Number(player.y))),
     }));
@@ -91,6 +92,22 @@ function normalizePayload(payload) {
       formations: splitEffects(coach.formation),
     } : null,
     teamColors: normalizeTeamColors(payload?.totalTeamColor),
+  };
+}
+
+function enrichPlayerMetadata(profile) {
+  const metadata = db.prepare("SELECT name, season_name, season_image FROM player_metadata WHERE spid = ?");
+  return {
+    ...profile,
+    players: profile.players.map((player) => {
+      const item = metadata.get(Number(player.spid));
+      return {
+        ...player,
+        name: item?.name || player.name,
+        season: item?.season_name || player.season,
+        seasonImage: safeImage(item?.season_image) || player.seasonImage || null,
+      };
+    }),
   };
 }
 
@@ -137,9 +154,17 @@ export async function getSquadProfile(nickname) {
     SELECT payload_json FROM squad_profile_cache
     WHERE snapshot_id = ? AND ranker_id = ?
   `).get(snapshot.id, ranker.id);
-  if (cached) return { snapshot, profile: JSON.parse(cached.payload_json), cached: true };
+  if (cached) {
+    const cachedProfile = JSON.parse(cached.payload_json);
+    const profile = enrichPlayerMetadata(cachedProfile);
+    if (profile.players.some((player, index) => player.seasonImage !== cachedProfile.players[index]?.seasonImage)) {
+      db.prepare(`UPDATE squad_profile_cache SET payload_json = ?, fetched_at = ? WHERE snapshot_id = ? AND ranker_id = ?`)
+        .run(JSON.stringify(profile), new Date().toISOString(), snapshot.id, ranker.id);
+    }
+    return { snapshot, profile, cached: true };
+  }
 
-  const profile = await fetchSquadProfile(ranker.nexon_sn);
+  const profile = enrichPlayerMetadata(await fetchSquadProfile(ranker.nexon_sn));
   db.prepare(`
     INSERT OR REPLACE INTO squad_profile_cache (snapshot_id, ranker_id, payload_json, fetched_at)
     VALUES (?, ?, ?, ?)

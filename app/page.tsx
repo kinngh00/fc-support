@@ -64,7 +64,7 @@ type HistoryChange = { label: string; trend: "up" | "down" | "same" };
 type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null; seasonImage: string | null };
 type SquadProfileDetails = {
   formation: string | null;
-  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; x: number; y: number }>;
+  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; seasonImage: string | null; x: number; y: number }>;
   coach: { id: string; name: string; image: string | null; description: string | null; abilities: string[]; formations: string[] } | null;
   teamColors: Array<{ id: string; category: string; categoryLabel: string; level: number; name: string; effects: string[]; image: string | null; playerCount: number }>;
 };
@@ -345,8 +345,7 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
         >
           <span>{player.position || "—"}</span>
           <PlayerImage spid={player.spid} name={player.name || "선수"} wrapperClassName="formation-player-image" />
-          <b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
-          <small>{player.season || "시즌 정보 없음"} · +{player.grade}</small>
+          <div className="formation-player-info"><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="formation-player-season"><SeasonBadge season={player.season} image={player.seasonImage} /><b>+{player.grade}</b></small></div>
         </article>
       ))}
     </div>
