@@ -202,13 +202,13 @@ function HistoryFrameToggle({ value, onChange }: { value: HistoryFrame; onChange
 function PlayerImage({ spid, name, wrapperClassName = "", preserveSpace = false }: {
   spid: string; name: string; wrapperClassName?: string; preserveSpace?: boolean;
 }) {
-  const [source, setSource] = useState<"action" | "player" | "missing">("action");
-  const image = source === "action"
-    ? `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`
+  const [source, setSource] = useState<"official" | "player" | "missing">("official");
+  const image = source === "official"
+    ? `${apiBaseUrl}/api/players/${spid}/image`
     : `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${spid}.png`;
   const content = source === "missing"
     ? (preserveSpace ? <span className="squad-player-image-missing" aria-label={`${name} 이미지 없음`} /> : null)
-    : <img alt={`${name} 선수 이미지`} src={image} onError={() => setSource((current) => current === "action" ? "player" : "missing")} />;
+    : <img alt={`${name} 선수 이미지`} src={image} onError={() => setSource((current) => current === "official" ? "player" : "missing")} />;
   if (wrapperClassName) return <div className={`${wrapperClassName} ${source === "missing" ? "missing" : ""}`}>{content}</div>;
   return content;
 }

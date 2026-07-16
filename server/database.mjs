@@ -85,6 +85,8 @@ export function initializeDatabase() {
       name TEXT NOT NULL,
       season_name TEXT,
       season_image TEXT,
+      image_url TEXT,
+      image_checked_at TEXT,
       updated_at TEXT NOT NULL
     );
 
@@ -134,6 +136,16 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS backend_logs_created_idx
       ON backend_logs(created_at DESC);
   `);
+
+  const playerMetadataColumns = new Set(
+    db.prepare("PRAGMA table_info(player_metadata)").all().map((column) => column.name),
+  );
+  if (!playerMetadataColumns.has("image_url")) {
+    db.exec("ALTER TABLE player_metadata ADD COLUMN image_url TEXT");
+  }
+  if (!playerMetadataColumns.has("image_checked_at")) {
+    db.exec("ALTER TABLE player_metadata ADD COLUMN image_checked_at TEXT");
+  }
 }
 
 export function transaction(callback) {

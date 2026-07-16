@@ -19,7 +19,7 @@
     "collect": "node --env-file-if-exists=.env server/collect.mjs",
     "collect:ranking-check": "node --env-file-if-exists=.env server/check-ranking.mjs",
     "sync:team-assets": "node --env-file-if-exists=.env server/sync-team-assets.mjs",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/freshness.test.mjs",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/freshness.test.mjs tests/player-image-service.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
