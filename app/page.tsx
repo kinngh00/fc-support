@@ -28,15 +28,6 @@ type PickResponse = {
 
 type Query = { start: string; end: string; team: string; position: string };
 
-type BackendLog = {
-  id: number;
-  createdAt: string;
-  level: "정보" | "경고" | "오류" | "성공";
-  component: string;
-  message: string;
-  details: Record<string, unknown> | null;
-};
-
 type RankingItem = {
   rank: number;
   nickname: string;
@@ -102,18 +93,6 @@ function simpleSnapshotLabel(value?: string) {
   if (!value) return "시간 정보 없음";
   const match = value.match(/T(\d{2}):(\d{2})/);
   return match ? `${match[1]}:${match[2]} 기준` : "시간 정보 없음";
-}
-
-function logTime(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
 }
 
 function clubValueLabel(value: string | null) {
@@ -213,10 +192,6 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
-  const [logs, setLogs] = useState<BackendLog[]>([]);
-  const [logsLoading, setLogsLoading] = useState(true);
-  const [logsError, setLogsError] = useState("");
-  const [collectionRunning, setCollectionRunning] = useState(false);
   const [rankingTeam, setRankingTeam] = useState("");
   const [rankingResult, setRankingResult] = useState<RankingResponse | null>(null);
   const [rankingLoading, setRankingLoading] = useState(true);
@@ -442,31 +417,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rankingNickname]);
 
-  useEffect(() => {
-    let active = true;
-    async function loadLogs() {
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/logs?limit=200`, { cache: "no-store" });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "로그를 불러오지 못했습니다.");
-        if (!active) return;
-        setLogs(Array.isArray(payload.items) ? payload.items : []);
-        setCollectionRunning(Boolean(payload.collectionRunning));
-        setLogsError("");
-      } catch (requestError) {
-        if (active) setLogsError(requestError instanceof Error ? requestError.message : "로그를 불러오지 못했습니다.");
-      } finally {
-        if (active) setLogsLoading(false);
-      }
-    }
-    void loadLogs();
-    const timer = window.setInterval(loadLogs, 3000);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, []);
-
   async function applyFilters() {
     setHasSearched(true);
     setLoading(true);
@@ -501,7 +451,7 @@ export default function Home() {
         </a>
         <nav aria-label="주요 메뉴">
           <a className="active" href="#analysis">픽률 분석</a>
-          <a href="#backend-logs">백엔드 로그</a>
+          <a href="#user-search">구단주 검색</a>
           <a href="#ranking">랭커</a>
           <a href="#community">커뮤니티</a>
         </nav>
@@ -678,44 +628,6 @@ export default function Home() {
             </div>
           </div>
         ) : <div className="profile-empty">구단주를 검색하면 저장된 정보와 최근 경기가 표시됩니다.</div>}
-      </section>
-
-      <section className="log-section" id="backend-logs">
-        <div className="log-heading">
-          <div>
-            <p className="section-kicker">TEMPORARY BACKEND MONITOR</p>
-            <h2>백엔드 로그</h2>
-          </div>
-          <div className={`collector-state ${collectionRunning ? "running" : ""}`}>
-            <span /> {collectionRunning ? "집계 진행 중" : "대기 중"}
-          </div>
-        </div>
-
-        <div className="log-console">
-          <div className="log-console-bar">
-            <span>FC-SUPPORT / BACKEND</span>
-            <small>3초마다 자동 갱신 · 최근 200건</small>
-          </div>
-          <div className="log-list" aria-live="polite">
-            {logsLoading ? (
-              <div className="log-empty">실제 백엔드 로그를 불러오는 중입니다.</div>
-            ) : logsError ? (
-              <div className="log-empty error">{logsError}</div>
-            ) : logs.length === 0 ? (
-              <div className="log-empty">기록된 백엔드 로그가 없습니다.</div>
-            ) : logs.map((log) => (
-              <article className={`log-row level-${log.level}`} key={log.id}>
-                <time>{logTime(log.createdAt)}</time>
-                <span className="log-level">{log.level}</span>
-                <strong>{log.component}</strong>
-                <div>
-                  <p>{log.message}</p>
-                  {log.details && <code>{JSON.stringify(log.details)}</code>}
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
       </section>
 
       <section className="ranking-section" id="ranking">
