@@ -31,6 +31,15 @@ function safeImage(value) {
   }
 }
 
+function safePlayerImage(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  if (text.startsWith("/playersAction/")) {
+    return safeImage(`https://fo4.dn.nexoncdn.co.kr/live/externalAssets/common${text}`);
+  }
+  return safeImage(text);
+}
+
 async function fetchText(url, headers) {
   let lastError;
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -67,6 +76,8 @@ function normalizeTeamColors(totalTeamColor = {}) {
 }
 
 function normalizePayload(payload) {
+  const adaptation = Math.max(0, Math.min(5, Number(payload?.adap || 0)));
+  const adaptationOvrBonus = Math.max(0, 5 - adaptation);
   const starters = (Array.isArray(payload?.players) ? payload.players : [])
     .filter((player) => Number(player.state) === 0 && Number.isFinite(Number(player.x)) && Number.isFinite(Number(player.y)))
     .map((player) => ({
@@ -76,12 +87,21 @@ function normalizePayload(payload) {
       grade: Number(player.buildUp || 0),
       season: plainText(player.season) || null,
       seasonImage: null,
+      image: safePlayerImage(player.thumb || player.thumb_custom),
+      ovr: Number(player.ovr || 0) + adaptationOvrBonus,
+      pay: Number(player.pay || 0),
+      price: plainText(player.price) || null,
+      nationId: plainText(player.nationImg) || null,
+      nationImage: player.nationImg
+        ? safeImage(`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/countries/largeflags/f_${player.nationImg}.png`)
+        : null,
       x: Math.max(0, Math.min(100, Number(player.x))),
       y: Math.max(0, Math.min(100, Number(player.y))),
     }));
   const coach = payload?.coachinfo || {};
   return {
     formation: plainText(payload?.formation) || null,
+    adaptation,
     players: starters,
     coach: plainText(coach.name) ? {
       id: String(coach.id || payload.coach || ""),
@@ -156,6 +176,15 @@ export async function getSquadProfile(nickname) {
   `).get(snapshot.id, ranker.id);
   if (cached) {
     const cachedProfile = JSON.parse(cached.payload_json);
+    const needsDetailedPlayers = cachedProfile.players.some((player) =>
+      player.ovr == null || player.pay == null || player.price == null || player.nationImage == null || player.image == null,
+    );
+    if (needsDetailedPlayers) {
+      const profile = enrichPlayerMetadata(await fetchSquadProfile(ranker.nexon_sn));
+      db.prepare(`UPDATE squad_profile_cache SET payload_json = ?, fetched_at = ? WHERE snapshot_id = ? AND ranker_id = ?`)
+        .run(JSON.stringify(profile), new Date().toISOString(), snapshot.id, ranker.id);
+      return { snapshot, profile, cached: false };
+    }
     const profile = enrichPlayerMetadata(cachedProfile);
     if (profile.players.some((player, index) => player.seasonImage !== cachedProfile.players[index]?.seasonImage)) {
       db.prepare(`UPDATE squad_profile_cache SET payload_json = ?, fetched_at = ? WHERE snapshot_id = ? AND ranker_id = ?`)

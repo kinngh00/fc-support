@@ -64,7 +64,8 @@ type HistoryChange = { label: string; trend: "up" | "down" | "same" };
 type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null; seasonImage: string | null };
 type SquadProfileDetails = {
   formation: string | null;
-  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; seasonImage: string | null; x: number; y: number }>;
+  adaptation: number;
+  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; seasonImage: string | null; image: string | null; ovr: number; pay: number; price: string | null; nationId: string | null; nationImage: string | null; x: number; y: number }>;
   coach: { id: string; name: string; image: string | null; description: string | null; abilities: string[]; formations: string[] } | null;
   teamColors: Array<{ id: string; category: string; categoryLabel: string; level: number; name: string; effects: string[]; image: string | null; playerCount: number }>;
 };
@@ -176,6 +177,11 @@ function clubValueChangeLabel(amount: bigint) {
   if (jo > 0n) return `${jo.toLocaleString()}조 ${eok.toLocaleString()}억`;
   if (eok > 0n) return `${eok.toLocaleString()}억`;
   return absolute.toLocaleString("ko-KR");
+}
+
+function squadPriceLabel(value: string | null) {
+  const digits = value?.replace(/[^0-9]/g, "") || "";
+  return digits ? clubValueLabel(digits) : "가격 정보 없음";
 }
 
 function historyClubValueLabel(value: number) {
@@ -299,16 +305,16 @@ function HistoryFrameToggle({ value, onChange }: { value: HistoryFrame; onChange
   </div>;
 }
 
-function PlayerImage({ spid, name, wrapperClassName = "", preserveSpace = false }: {
-  spid: string; name: string; wrapperClassName?: string; preserveSpace?: boolean;
+function PlayerImage({ spid, name, directImage = null, wrapperClassName = "", preserveSpace = false }: {
+  spid: string; name: string; directImage?: string | null; wrapperClassName?: string; preserveSpace?: boolean;
 }) {
-  const [source, setSource] = useState<"official" | "player" | "missing">("official");
-  const image = source === "official"
+  const [source, setSource] = useState<"direct" | "official" | "player" | "missing">(directImage ? "direct" : "official");
+  const image = source === "direct" ? directImage : source === "official"
     ? `${apiBaseUrl}/api/players/${spid}/image`
     : `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${spid}.png`;
   const content = source === "missing"
     ? (preserveSpace ? <span className="squad-player-image-missing" aria-label={`${name} 이미지 없음`} /> : null)
-    : <img alt={`${name} 선수 이미지`} src={image} onError={() => setSource((current) => current === "official" ? "player" : "missing")} />;
+    : <img alt={`${name} 선수 이미지`} src={image || ""} onError={() => setSource((current) => current === "direct" ? "official" : current === "official" ? "player" : "missing")} />;
   if (wrapperClassName) return <div className={`${wrapperClassName} ${source === "missing" ? "missing" : ""}`}>{content}</div>;
   return content;
 }
@@ -343,9 +349,11 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
           key={`${player.spid}-${player.position}`}
           style={{ left: `${pitchX(player.x)}%`, bottom: `${pitchY(player.y)}%` }}
         >
-          <span>{player.position || "—"}</span>
-          <PlayerImage spid={player.spid} name={player.name || "선수"} wrapperClassName="formation-player-image" />
-          <div className="formation-player-info"><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="formation-player-season"><SeasonBadge season={player.season} image={player.seasonImage} /><b>+{player.grade}</b></small></div>
+          <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>OVR {player.ovr}</strong></div>
+          <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="formation-player-image" />
+          <b className="formation-player-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
+          <div className="formation-player-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><b>+{player.grade}</b>{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
+          <div className="formation-player-price"><span>급여 {player.pay}</span><b>{squadPriceLabel(player.price)}</b></div>
         </article>
       ))}
     </div>
@@ -396,7 +404,7 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
   }, [nickname]);
 
   return <>
-    <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><div className="squad-heading-tools"><b>{squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={() => setFormationView((current) => !current)} /></div></div>
+    <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3><small className="squad-adaptation-note">모든 선수는 적응도 5로 표시됩니다.</small></div><div className="squad-heading-tools"><b>{squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={() => setFormationView((current) => !current)} /></div></div>
     {formationView && details ? <FormationPitch details={details} fallbackFormation={formation} /> : squad.length > 0 ? <div className="squad-grid">{orderedSquad(squad).map((player) => (
       <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
     ))}</div> : <div className={emptyClassName}>저장된 선발 스쿼드가 없습니다.</div>}
