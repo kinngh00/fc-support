@@ -64,7 +64,11 @@ type RankingResponse = {
   hasMore: boolean;
 };
 
-const positions = ["GK", "RB", "RCB", "LCB", "LB", "CDM", "RM", "RCM", "LCM", "LM", "RAM", "CAM", "LAM"];
+const positions = [
+  "GK", "SW", "LWB", "LB", "LCB", "CB", "RCB", "RB", "RWB",
+  "LDM", "CDM", "RDM", "LM", "LCM", "CM", "RCM", "RM",
+  "LAM", "CAM", "RAM", "LW", "LF", "CF", "RF", "RW", "LS", "ST", "RS",
+];
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8787";
 
 function seasonLabel(season: string | null) {

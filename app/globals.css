@@ -13,6 +13,7 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+main { overflow-x: clip; }
 body {
   margin: 0;
   background: var(--paper);
@@ -282,11 +283,11 @@ footer p { color: rgba(244,243,237,.65); font-size: 11px; margin: 0; } footer sm
 @media (max-width: 600px) {
   .site-header { height: 120px; padding-left: 18px; padding-right: 18px; }.login-button { padding: 8px 14px; }
   .site-header nav { gap: 22px; font-size: 14px; }
-  .hero { min-height: 760px; padding: 176px 20px 72px; }.hero h1 { font-size: clamp(43px, 13vw, 56px); }.hero-description { font-size: 17px; line-height: 1.7; margin-left: 0; margin-top: 32px; }.desktop-break { display: none; }
+  .hero { min-height: 760px; padding: 176px 20px 72px; }.hero-copy { min-width: 0; }.hero h1 { font-size: clamp(40px, 11vw, 48px); max-width: 100%; overflow-wrap: anywhere; }.hero-description { font-size: 17px; line-height: 1.7; margin-left: 0; margin-top: 32px; }.desktop-break { display: none; }
   .hero-index { margin-top: 48px; max-width: 100%; }
   .analysis-shell { padding-bottom: 75px; padding-top: 75px; }.section-heading { align-items: start; flex-direction: column; gap: 22px; }
   .filter-panel { display: block; padding: 0 20px; }.rank-fieldset { border-bottom: 1px solid rgba(244,243,237,.14); border-right: 0; min-height: 120px; padding-right: 0; }.select-field { min-height: 100px; padding-left: 0; padding-right: 0; }.select-field::after { right: 0; }.search-button { min-height: 64px; margin: 0 -20px; width: calc(100% + 40px); }
-  .position-panel { padding: 24px 18px; }.position-grid { grid-template-columns: repeat(5, 1fr); }.result-content { padding: 28px 18px; }.result-topline { align-items: start; flex-direction: column; gap: 18px; }
+  .results-layout, .position-panel, .position-grid { min-width: 0; width: 100%; }.position-panel { padding: 24px 18px; }.position-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }.result-content { padding: 28px 18px; }.result-topline { align-items: start; flex-direction: column; gap: 18px; }
   .player-row { grid-template-columns: 26px 56px 1fr; min-height: 128px; }.player-photo { height: 88px; width: 56px; }.player-identity { padding-left: 12px; }.player-identity h4 { font-size: 18px; }.pick-meter { grid-column: 2 / 4; padding-left: 0; }
   .ranking-strip { gap: 10px 14px; grid-template-columns: auto 1fr; }.ranking-strip span { grid-column: 1 / -1; width: 100%; }.ranking-strip p:last-child { grid-column: 1 / -1; }
   .ranking-section { padding-bottom: 80px; padding-top: 80px; }.ranking-board { margin-left: -24px; margin-right: -24px; }
