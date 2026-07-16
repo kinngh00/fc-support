@@ -685,7 +685,7 @@ export default function Home() {
                       <PlayerImage spid={player.spid} name={player.name || "선수"} wrapperClassName="player-photo" />
                       <div className="player-identity">
                         <div><SeasonBadge season={player.season} image={player.seasonImage} /><b>+{player.grade}</b></div>
-                        <h4>{player.name || "선수명 정보 없음"}</h4><small>SPID {player.spid}</small>
+                        <h4>{player.name || "선수명 정보 없음"}</h4>
                       </div>
                       <div className="pick-meter">
                         <div><span>사용 {player.count.toLocaleString()}명</span><b>{player.pickRate.toFixed(2)}%</b></div>
@@ -738,7 +738,7 @@ export default function Home() {
             <div className="profile-block">
               <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
               {profileResult.squad.length > 0 ? <div className="squad-grid">{profileResult.squad.map((player) => (
-                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small><small>SPID {player.spid}</small></div></article>
+                <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
               ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
             </div>
 
@@ -902,7 +902,7 @@ export default function Home() {
                     <div className="modal-content-block">
                       <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{modalProfile.squad.length}명</b></div>
                       {modalProfile.squad.length > 0 ? <div className="squad-grid">{modalProfile.squad.map((player) => (
-                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small><small>SPID {player.spid}</small></div></article>
+                        <article key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
                       ))}</div> : <div className="modal-state">저장된 선발 스쿼드가 없습니다.</div>}
                     </div>
                   )}
