@@ -193,6 +193,7 @@ function RankingDelta({ direction, label, unavailable = false }: {
   label: string;
   unavailable?: boolean;
 }) {
+  if (!unavailable && direction === "same") return null;
   return <small className={`ranking-delta trend-${unavailable ? "unavailable" : direction}`}>
     {unavailable ? "이전 기록 없음" : direction === "up" ? `▲ ${label}` : direction === "down" ? `▼ ${label}` : "변동 없음"}
   </small>;
@@ -308,13 +309,16 @@ function HistoryFrameToggle({ value, onChange }: { value: HistoryFrame; onChange
 function PlayerImage({ spid, name, directImage = null, wrapperClassName = "", preserveSpace = false }: {
   spid: string; name: string; directImage?: string | null; wrapperClassName?: string; preserveSpace?: boolean;
 }) {
-  const [source, setSource] = useState<"direct" | "official" | "player" | "missing">(directImage ? "direct" : "official");
+  const [source, setSource] = useState<"direct" | "official" | "legacy" | "player" | "missing">(directImage ? "direct" : "official");
+  const pid = spid.slice(-6);
   const image = source === "direct" ? directImage : source === "official"
     ? `${apiBaseUrl}/api/players/${spid}/image`
-    : `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${spid}.png`;
+    : source === "legacy" ? `https://fo4.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${pid}_25.png`
+    : source === "player" ? `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${spid}.png`
+    : `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/not_found.png`;
   const content = source === "missing"
-    ? (preserveSpace ? <span className="squad-player-image-missing" aria-label={`${name} 이미지 없음`} /> : null)
-    : <img alt={`${name} 선수 이미지`} src={image || ""} onError={() => setSource((current) => current === "direct" ? "official" : current === "official" ? "player" : "missing")} />;
+    ? <img alt={`${name} 선수 이미지 없음`} src={image} />
+    : <img alt={`${name} 선수 이미지`} src={image || ""} onError={() => setSource((current) => current === "direct" ? "official" : current === "official" ? "legacy" : current === "legacy" ? "player" : "missing")} />;
   if (wrapperClassName) return <div className={`${wrapperClassName} ${source === "missing" ? "missing" : ""}`}>{content}</div>;
   return content;
 }
@@ -333,11 +337,11 @@ function EnhancementBadge({ grade }: { grade: number }) {
   return <span className={`enhancement-badge enhancement-${style}`} aria-label={`${grade}강`}>+{grade}</span>;
 }
 
-function CompactSwitch({ label, checked, onChange, disabled = false }: {
-  label: string; checked: boolean; onChange: () => void; disabled?: boolean;
+function CompactSwitch({ label, checked, onChange, disabled = false, showStateText = true }: {
+  label: string; checked: boolean; onChange: () => void; disabled?: boolean; showStateText?: boolean;
 }) {
   return <button className={`compact-switch ${checked ? "active" : ""}`} type="button" role="switch" aria-checked={checked} disabled={disabled} onClick={onChange}>
-    <span>{label}</span><i aria-hidden="true"><em /></i><b>{checked ? "ON" : "OFF"}</b>
+    <span>{label}</span><i aria-hidden="true"><em /></i>{showStateText && <b>{checked ? "ON" : "OFF"}</b>}
   </button>;
 }
 
@@ -955,7 +959,7 @@ export default function Home() {
           <aside className="position-panel">
             <div className="position-panel-heading">
               <p>POSITION</p>
-              <CompactSwitch label="상세 포지션" checked={detailedPositions} onChange={() => void toggleDetailedPositions()} />
+              <CompactSwitch label="상세 포지션" checked={detailedPositions} showStateText={false} onChange={() => void toggleDetailedPositions()} />
             </div>
             <div className="position-grid">
               {!hasSearched ? <p className="position-empty">조회 후 사용할 수 있는 포지션이 표시됩니다.</p> : availablePositions.length > 0 ? availablePositions.map((item) => (
