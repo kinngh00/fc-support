@@ -44,6 +44,9 @@ type RankingItem = {
   teamColorCount: number | null;
   formation: string | null;
   lineupStatus: string;
+  previousRank: number | null;
+  previousClubValue: string | null;
+  previousWinRate: number | null;
 };
 
 type RankingResponse = {
@@ -169,6 +172,38 @@ function clubValueChangeLabel(amount: bigint) {
   return absolute.toLocaleString("ko-KR");
 }
 
+function historyClubValueLabel(value: number) {
+  return clubValueLabel(String(BigInt(Math.round(value)) * 1_000_000_000_000n));
+}
+
+function RankingDelta({ direction, label, unavailable = false }: {
+  direction: "up" | "down" | "same";
+  label: string;
+  unavailable?: boolean;
+}) {
+  return <small className={`ranking-delta trend-${unavailable ? "unavailable" : direction}`}>
+    {unavailable ? "이전 기록 없음" : direction === "up" ? `▲ ${label}` : direction === "down" ? `▼ ${label}` : "변동 없음"}
+  </small>;
+}
+
+function RankDelta({ current, previous }: { current: number; previous: number | null }) {
+  if (previous == null) return <RankingDelta direction="same" label="" unavailable />;
+  const difference = previous - current;
+  return <RankingDelta direction={difference > 0 ? "up" : difference < 0 ? "down" : "same"} label={`${Math.abs(difference).toLocaleString()}위`} />;
+}
+
+function ClubValueDelta({ current, previous }: { current: string | null; previous: string | null }) {
+  if (current == null || previous == null) return <RankingDelta direction="same" label="" unavailable />;
+  const difference = BigInt(current) - BigInt(previous);
+  return <RankingDelta direction={difference > 0n ? "up" : difference < 0n ? "down" : "same"} label={clubValueChangeLabel(difference)} />;
+}
+
+function WinRateDelta({ current, previous }: { current: number | null; previous: number | null }) {
+  if (current == null || previous == null) return <RankingDelta direction="same" label="" unavailable />;
+  const difference = current - previous;
+  return <RankingDelta direction={difference > 0 ? "up" : difference < 0 ? "down" : "same"} label={`${Math.abs(difference).toFixed(1)}%p`} />;
+}
+
 function rankHistoryChange(first: HistoryItem, last: HistoryItem): HistoryChange {
   const difference = first.rank - last.rank;
   if (difference > 0) return { label: `${difference.toLocaleString()}등 상승`, trend: "up" };
@@ -279,11 +314,12 @@ function SeasonBadge({ season, image }: { season: string | null; image: string |
   );
 }
 
-function HistoryChart({ title, items, value, format, frame, change, lowerIsHigher = false }: {
+function HistoryChart({ title, items, value, format, formatPoint, frame, change, lowerIsHigher = false }: {
   title: string;
   items: HistoryItem[];
   value: (item: HistoryItem) => number | null;
   format: (item: HistoryItem) => string;
+  formatPoint: (point: number) => string;
   frame: HistoryFrame;
   change: (first: HistoryItem, last: HistoryItem) => HistoryChange;
   lowerIsHigher?: boolean;
@@ -312,6 +348,9 @@ function HistoryChart({ title, items, value, format, frame, change, lowerIsHighe
   const activeCoordinate = activeIndex == null ? null : coordinates[activeIndex];
   const line = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
   const changeResult = change(chartItems[0].item, chartItems.at(-1)!.item);
+  const highest = lowerIsHigher ? min : max;
+  const lowest = lowerIsHigher ? max : min;
+  const average = points.reduce((sum, point) => sum + point, 0) / points.length;
   const finishDrag = (element: HTMLDivElement, pointerId: number) => {
     dragRef.current.active = false;
     if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
@@ -373,8 +412,12 @@ function HistoryChart({ title, items, value, format, frame, change, lowerIsHighe
         ><span>{historyTooltipLabel(active.item.dataTime)}</span><b>{format(active.item)}</b></div>}
       </div>
     </div>
+    <div className="history-chart-stats">
+      <span>최고 <b>{formatPoint(highest)}</b></span>
+      <span>최저 <b>{formatPoint(lowest)}</b></span>
+      <span>평균 <b>{formatPoint(average)}</b></span>
+    </div>
     <div className={`history-chart-change trend-${changeResult.trend}`}><span>{title}</span><b>{changeResult.label}</b></div>
-    <small className="history-chart-guide">좌우로 드래그하거나 휠로 이전 기록 보기</small>
   </div>;
 }
 
@@ -870,16 +913,17 @@ export default function Home() {
             </div>
 
             <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={historyFrame} onChange={setHistoryFrame} /></div>
+            <small className="history-navigation-guide">차트를 좌우로 드래그하거나 휠을 움직이면 이전 기록을 볼 수 있습니다.</small>
             <div className="history-grid">
-              <HistoryChart title="순위 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} change={rankHistoryChange} lowerIsHigher />
-              <HistoryChart title="구단가치 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} change={clubValueHistoryChange} />
-              <HistoryChart title="승률 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} change={winRateHistoryChange} />
+              <HistoryChart title="순위 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} formatPoint={(point) => `${Math.round(point).toLocaleString()}위`} change={rankHistoryChange} lowerIsHigher />
+              <HistoryChart title="구단가치 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} formatPoint={historyClubValueLabel} change={clubValueHistoryChange} />
+              <HistoryChart title="승률 변화" items={aggregateHistory(profileResult.history, historyFrame)} frame={historyFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} formatPoint={(point) => `${point.toFixed(1)}%`} change={winRateHistoryChange} />
             </div>
 
             <div className="profile-block">
               <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
               {profileResult.squad.length > 0 ? <div className="squad-grid">{orderedSquad(profileResult.squad).map((player) => (
-                <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
+                <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
               ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
             </div>
 
@@ -924,7 +968,6 @@ export default function Home() {
           <div className="ranking-controls">
             <form className="ranking-search" onSubmit={searchRanking}>
               <NicknameAutocomplete id="ranking-nickname" label="구단주 닉네임 검색" value={rankingNickname} onChange={setRankingNickname} />
-              <button type="submit">검색</button>
             </form>
             <div className="ranking-filter">
               <TeamAutocomplete id="ranking-team-color" label="팀컬러 필터" value={rankingTeam} options={teamColorNames} onChange={setRankingTeam} onSelect={(nextTeam) => { setRankingNickname(""); void fetchRankings(nextTeam, 1); }} />
@@ -962,7 +1005,7 @@ export default function Home() {
                     }
                   }}
                 >
-                  <strong className="ranking-number">{integerLabel(ranker.rank, 2)}</strong>
+                  <strong className="ranking-number">{integerLabel(ranker.rank, 2)}<RankDelta current={ranker.rank} previous={ranker.previousRank} /></strong>
                   <div className="ranking-coach">
                     <h3>{ranker.nickname}</h3>
                     <span>LV. {ranker.level?.toLocaleString() ?? "정보 없음"}</span>
@@ -973,8 +1016,8 @@ export default function Home() {
                   </div>
                   <span className="ranking-formation">{ranker.formation || "—"}</span>
                   <strong className="ranking-elo">{ranker.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "—"}</strong>
-                  <div className="ranking-record"><b>{ranker.winRate == null ? "—" : `${ranker.winRate.toFixed(1)}%`}</b><small>{integerLabel(ranker.wins)}승 {integerLabel(ranker.draws)}무 {integerLabel(ranker.losses)}패</small></div>
-                  <span className="ranking-value">{clubValueLabel(ranker.clubValue)}</span>
+                  <div className="ranking-record"><b>{ranker.winRate == null ? "—" : `${ranker.winRate.toFixed(1)}%`}</b><WinRateDelta current={ranker.winRate} previous={ranker.previousWinRate} /><small>{integerLabel(ranker.wins)}승 {integerLabel(ranker.draws)}무 {integerLabel(ranker.losses)}패</small></div>
+                  <span className="ranking-value">{clubValueLabel(ranker.clubValue)}<ClubValueDelta current={ranker.clubValue} previous={ranker.previousClubValue} /></span>
                 </article>
               ))}
             </div>
@@ -1032,10 +1075,11 @@ export default function Home() {
                         </dl>
                       </div>
                       <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={modalHistoryFrame} onChange={setModalHistoryFrame} /></div>
+                      <small className="history-navigation-guide">차트를 좌우로 드래그하거나 휠을 움직이면 이전 기록을 볼 수 있습니다.</small>
                       <div className="history-grid">
-                        <HistoryChart title="순위 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} change={rankHistoryChange} lowerIsHigher />
-                        <HistoryChart title="구단가치 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} change={clubValueHistoryChange} />
-                        <HistoryChart title="승률 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} change={winRateHistoryChange} />
+                        <HistoryChart title="순위 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} formatPoint={(point) => `${Math.round(point).toLocaleString()}위`} change={rankHistoryChange} lowerIsHigher />
+                        <HistoryChart title="구단가치 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} formatPoint={historyClubValueLabel} change={clubValueHistoryChange} />
+                        <HistoryChart title="승률 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} formatPoint={(point) => `${point.toFixed(1)}%`} change={winRateHistoryChange} />
                       </div>
                     </div>
                   )}
@@ -1043,7 +1087,7 @@ export default function Home() {
                     <div className="modal-content-block">
                       <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{modalProfile.squad.length}명</b></div>
                       {modalProfile.squad.length > 0 ? <div className="squad-grid">{orderedSquad(modalProfile.squad).map((player) => (
-                        <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
+                        <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
                       ))}</div> : <div className="modal-state">저장된 선발 스쿼드가 없습니다.</div>}
                     </div>
                   )}

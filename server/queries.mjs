@@ -34,6 +34,9 @@ function rankingItem(row) {
     bestGrade: row.best_grade,
     previousGrade: row.previous_grade,
     lineupStatus: row.lineup_status,
+    previousRank: row.previous_rank == null ? null : Number(row.previous_rank),
+    previousClubValue: row.previous_club_value == null ? null : String(row.previous_club_value),
+    previousWinRate: row.previous_win_rate == null ? null : Number(row.previous_win_rate),
   };
 }
 
@@ -259,21 +262,35 @@ export function listRankings({ rankStart, rankEnd, teamColor, offset, limit }) {
   `).get(...parameters).count);
 
   const rows = db.prepare(`
+    WITH page AS (
+      SELECT e.*, r.nickname, r.nexon_sn, r.id AS ranker_id
+      FROM ranking_entries e
+      JOIN rankers r ON r.id = e.ranker_id
+      WHERE e.snapshot_id = ? AND e.rank BETWEEN ? AND ? ${teamClause}
+      ORDER BY e.rank ASC
+      LIMIT ? OFFSET ?
+    )
     SELECT
-      e.rank, r.nickname, r.nexon_sn, e.level,
-      CAST(e.club_value AS TEXT) AS club_value,
-      e.elo, e.win_rate, e.wins, e.draws, e.losses,
-      e.team_colors_json, e.primary_team_color, e.team_color_count,
-      e.formation, e.current_grade, e.best_grade, e.previous_grade,
+      page.rank, page.nickname, page.nexon_sn, page.level,
+      CAST(page.club_value AS TEXT) AS club_value,
+      page.elo, page.win_rate, page.wins, page.draws, page.losses,
+      page.team_colors_json, page.primary_team_color, page.team_color_count,
+      page.formation, page.current_grade, page.best_grade, page.previous_grade,
       asset.image_url AS team_image,
-      e.lineup_status
-    FROM ranking_entries e
-    JOIN rankers r ON r.id = e.ranker_id
-    LEFT JOIN team_color_assets asset ON asset.name = e.primary_team_color
-    WHERE e.snapshot_id = ? AND e.rank BETWEEN ? AND ? ${teamClause}
-    ORDER BY e.rank ASC
-    LIMIT ? OFFSET ?
-  `).all(...parameters, limit, offset);
+      page.lineup_status,
+      (SELECT h.rank FROM ranking_history h
+        WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
+        ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_rank,
+      (SELECT CAST(h.club_value AS TEXT) FROM ranking_history h
+        WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
+        ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_club_value,
+      (SELECT h.win_rate FROM ranking_history h
+        WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
+        ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_win_rate
+    FROM page
+    LEFT JOIN team_color_assets asset ON asset.name = page.primary_team_color
+    ORDER BY page.rank ASC
+  `).all(...parameters, limit, offset, snapshot.data_time, snapshot.data_time, snapshot.data_time);
 
   return {
     snapshot,
@@ -289,21 +306,35 @@ export function searchRankings({ nickname, limit = 20 }) {
   const pattern = `${escaped}%`;
 
   const rows = db.prepare(`
+    WITH page AS (
+      SELECT e.*, r.nickname, r.nexon_sn, r.id AS ranker_id
+      FROM ranking_entries e
+      JOIN rankers r ON r.id = e.ranker_id
+      WHERE e.snapshot_id = ? AND r.nickname LIKE ? ESCAPE '\\' COLLATE NOCASE
+      ORDER BY r.nickname COLLATE NOCASE ASC, e.rank ASC
+      LIMIT ?
+    )
     SELECT
-      e.rank, r.nickname, r.nexon_sn, e.level,
-      CAST(e.club_value AS TEXT) AS club_value,
-      e.elo, e.win_rate, e.wins, e.draws, e.losses,
-      e.team_colors_json, e.primary_team_color, e.team_color_count,
-      e.formation, e.current_grade, e.best_grade, e.previous_grade,
+      page.rank, page.nickname, page.nexon_sn, page.level,
+      CAST(page.club_value AS TEXT) AS club_value,
+      page.elo, page.win_rate, page.wins, page.draws, page.losses,
+      page.team_colors_json, page.primary_team_color, page.team_color_count,
+      page.formation, page.current_grade, page.best_grade, page.previous_grade,
       asset.image_url AS team_image,
-      e.lineup_status
-    FROM ranking_entries e
-    JOIN rankers r ON r.id = e.ranker_id
-    LEFT JOIN team_color_assets asset ON asset.name = e.primary_team_color
-    WHERE e.snapshot_id = ? AND r.nickname LIKE ? ESCAPE '\\' COLLATE NOCASE
-    ORDER BY r.nickname COLLATE NOCASE ASC, e.rank ASC
-    LIMIT ?
-  `).all(snapshot.id, pattern, limit);
+      page.lineup_status,
+      (SELECT h.rank FROM ranking_history h
+        WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
+        ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_rank,
+      (SELECT CAST(h.club_value AS TEXT) FROM ranking_history h
+        WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
+        ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_club_value,
+      (SELECT h.win_rate FROM ranking_history h
+        WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
+        ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_win_rate
+    FROM page
+    LEFT JOIN team_color_assets asset ON asset.name = page.primary_team_color
+    ORDER BY page.nickname COLLATE NOCASE ASC, page.rank ASC
+  `).all(snapshot.id, pattern, limit, snapshot.data_time, snapshot.data_time, snapshot.data_time);
 
   return { snapshot, total: rows.length, items: rows.map(rankingItem) };
 }
