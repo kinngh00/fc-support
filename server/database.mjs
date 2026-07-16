@@ -111,6 +111,16 @@ export function initializeDatabase() {
       PRIMARY KEY (ranker_id, data_time)
     );
 
+    CREATE TABLE IF NOT EXISTS squad_profile_cache (
+      snapshot_id INTEGER NOT NULL,
+      ranker_id INTEGER NOT NULL,
+      payload_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL,
+      PRIMARY KEY (snapshot_id, ranker_id),
+      FOREIGN KEY (snapshot_id, ranker_id)
+        REFERENCES ranking_entries(snapshot_id, ranker_id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS app_state (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL

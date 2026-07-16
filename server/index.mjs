@@ -8,6 +8,7 @@ import { listLogs, logger } from "./logger.mjs";
 import { inspectSnapshotFreshness } from "./freshness.mjs";
 import { listRecentMatches } from "./match-service.mjs";
 import { getPlayerImageUrl } from "./player-image-service.mjs";
+import { getSquadProfile } from "./squad-profile-service.mjs";
 
 function send(response, status, payload) {
   response.writeHead(status, {
@@ -112,6 +113,16 @@ const server = http.createServer(async (request, response) => {
       const nickname = (url.searchParams.get("nickname") || "").trim();
       if (!nickname) throw new Error("nickname is required.");
       const result = getUserProfile(nickname);
+      if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
+      if (!result.profile) return send(response, 404, { code: "USER_NOT_FOUND", message: "현재 랭킹에서 구단주를 찾지 못했습니다." });
+      return send(response, 200, result);
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/users/squad-details") {
+      const nickname = (url.searchParams.get("nickname") || "").trim();
+      if (!nickname) throw new Error("nickname is required.");
+      if (nickname.length > 50) throw new Error("nickname must be 50 characters or fewer.");
+      const result = await getSquadProfile(nickname);
       if (!result) return send(response, 404, { code: "NO_SNAPSHOT", message: "수집된 데이터가 없습니다." });
       if (!result.profile) return send(response, 404, { code: "USER_NOT_FOUND", message: "현재 랭킹에서 구단주를 찾지 못했습니다." });
       return send(response, 200, result);

@@ -62,6 +62,12 @@ type HistoryItem = { dataTime: string; rank: number; clubValue: string; winRate:
 type HistoryFrame = "hour" | "day" | "week";
 type HistoryChange = { label: string; trend: "up" | "down" | "same" };
 type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null; seasonImage: string | null };
+type SquadProfileDetails = {
+  formation: string | null;
+  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; x: number; y: number }>;
+  coach: { id: string; name: string; image: string | null; description: string | null; abilities: string[]; formations: string[] } | null;
+  teamColors: Array<{ id: string; category: string; categoryLabel: string; level: number; name: string; effects: string[]; image: string | null; playerCount: number }>;
+};
 type UserProfileResponse = {
   snapshot: { id: number; data_time: string };
   profile: RankingItem & { hasOuid: boolean };
@@ -236,8 +242,8 @@ function paginationItems(current: number, total: number) {
   return result;
 }
 
-function TeamAutocomplete({ id, label, value, options, onChange, onSelect }: {
-  id: string; label: string; value: string; options: string[]; onChange: (value: string) => void; onSelect?: (value: string) => void;
+function TeamAutocomplete({ id, label, value, options, onChange, onSelect, clearable = false, onClear }: {
+  id: string; label: string; value: string; options: string[]; onChange: (value: string) => void; onSelect?: (value: string) => void; clearable?: boolean; onClear?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const normalized = value.trim().toLocaleLowerCase("ko-KR");
@@ -245,9 +251,10 @@ function TeamAutocomplete({ id, label, value, options, onChange, onSelect }: {
     .filter((option) => !normalized || option.toLocaleLowerCase("ko-KR").startsWith(normalized))
     .slice(0, 12);
   return (
-    <div className="autocomplete-field">
+    <div className={`autocomplete-field ${clearable && value ? "has-clear" : ""}`}>
       <label htmlFor={id}>{label}</label>
       <input id={id} role="combobox" aria-controls={`${id}-options`} aria-expanded={open} autoComplete="off" value={value} placeholder="전체 팀" onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 120)} onChange={(event) => { onChange(event.target.value); setOpen(true); }} />
+      {clearable && value && <button className="autocomplete-clear" type="button" aria-label={`${label} 지우기`} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(""); setOpen(false); onClear?.(); }}>×</button>}
       {open && matches.length > 0 && <div className="autocomplete-menu" id={`${id}-options`} role="listbox">
         {!normalized && <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(""); onSelect?.(""); setOpen(false); }}>전체 팀</button>}
         {matches.map((option) => <button type="button" role="option" aria-selected={value === option} key={option} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(option); onSelect?.(option); setOpen(false); }}>{option}</button>)}
@@ -256,8 +263,8 @@ function TeamAutocomplete({ id, label, value, options, onChange, onSelect }: {
   );
 }
 
-function NicknameAutocomplete({ id, label, value, onChange }: {
-  id: string; label: string; value: string; onChange: (value: string) => void;
+function NicknameAutocomplete({ id, label, value, onChange, clearable = false, onClear }: {
+  id: string; label: string; value: string; onChange: (value: string) => void; clearable?: boolean; onClear?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Array<{ nickname: string; rank: number }>>([]);
@@ -275,9 +282,10 @@ function NicknameAutocomplete({ id, label, value, onChange }: {
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [open, value]);
   return (
-    <div className="autocomplete-field nickname-autocomplete">
+    <div className={`autocomplete-field nickname-autocomplete ${clearable && value ? "has-clear" : ""}`}>
       <label htmlFor={id}>{label}</label>
       <input id={id} role="combobox" aria-controls={`${id}-options`} aria-expanded={open} autoComplete="off" value={value} placeholder="닉네임 입력" onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 120)} onChange={(event) => { onChange(event.target.value); if (!event.target.value.trim()) setSuggestions([]); setOpen(true); }} />
+      {clearable && value && <button className="autocomplete-clear" type="button" aria-label={`${label} 지우기`} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(""); setSuggestions([]); setOpen(false); onClear?.(); }}>×</button>}
       {open && suggestions.length > 0 && <div className="autocomplete-menu" id={`${id}-options`} role="listbox">
         {suggestions.map((item) => <button type="button" role="option" aria-selected={value === item.nickname} key={`${item.rank}-${item.nickname}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item.nickname); setOpen(false); }}><span>{item.nickname}</span><small>{item.rank.toLocaleString()}위</small></button>)}
       </div>}
@@ -312,6 +320,89 @@ function SeasonBadge({ season, image }: { season: string | null; image: string |
       {image ? <img src={image} alt={`${label} 시즌`} /> : <span>{seasonLabel(season)}</span>}
     </span>
   );
+}
+
+function CompactSwitch({ label, checked, onChange, disabled = false }: {
+  label: string; checked: boolean; onChange: () => void; disabled?: boolean;
+}) {
+  return <button className={`compact-switch ${checked ? "active" : ""}`} type="button" role="switch" aria-checked={checked} disabled={disabled} onClick={onChange}>
+    <span>{label}</span><i aria-hidden="true"><em /></i><b>{checked ? "ON" : "OFF"}</b>
+  </button>;
+}
+
+function FormationPitch({ details, fallbackFormation }: { details: SquadProfileDetails; fallbackFormation: string | null }) {
+  const pitchX = (value: number) => Math.max(8, Math.min(92, 50 + (value - 50) * 1.65));
+  const pitchY = (value: number) => Math.max(7, Math.min(88, 6 + value * 1.2));
+  return <div className="formation-view">
+    <div className="formation-view-title"><span>FORMATION</span><b>{details.formation || fallbackFormation || "포메이션 정보 없음"}</b></div>
+    <div className="formation-pitch">
+      <div className="pitch-halfway" /><div className="pitch-circle" /><div className="pitch-box pitch-box-top" /><div className="pitch-box pitch-box-bottom" />
+      {details.players.map((player) => (
+        <article
+          className={`formation-player position-${positionGroup(player.position)}`}
+          key={`${player.spid}-${player.position}`}
+          style={{ left: `${pitchX(player.x)}%`, bottom: `${pitchY(player.y)}%` }}
+        >
+          <span>{player.position || "—"}</span>
+          <PlayerImage spid={player.spid} name={player.name || "선수"} wrapperClassName="formation-player-image" />
+          <b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
+          <small>{player.season || "시즌 정보 없음"} · +{player.grade}</small>
+        </article>
+      ))}
+    </div>
+  </div>;
+}
+
+function SquadSupportDetails({ details }: { details: SquadProfileDetails }) {
+  return <div className="squad-support-details">
+    <section className="squad-coach-card">
+      <div className="squad-detail-heading"><span>MANAGER</span><h4>감독</h4></div>
+      {details.coach ? <div className="coach-content">
+        {details.coach.image ? <img src={details.coach.image} alt={`${details.coach.name} 감독`} /> : <span className="coach-image-missing">이미지 없음</span>}
+        <div><h5>{details.coach.name}</h5>{details.coach.description && <p>{details.coach.description}</p>}
+          <dl><div><dt>효과</dt><dd>{details.coach.abilities.length ? details.coach.abilities.join(" · ") : "효과 정보 없음"}</dd></div><div><dt>선호 포메이션</dt><dd>{details.coach.formations.length ? details.coach.formations.join(" · ") : "정보 없음"}</dd></div></dl>
+        </div>
+      </div> : <p className="squad-detail-empty">등록된 감독 정보가 없습니다.</p>}
+    </section>
+    <section className="squad-team-colors">
+      <div className="squad-detail-heading"><span>ACTIVE TEAM COLORS</span><h4>적용 팀컬러</h4></div>
+      {details.teamColors.length ? <div className="team-color-detail-list">{details.teamColors.map((color) => <article key={`${color.category}-${color.id}-${color.name}`}>
+        {color.image ? <img src={color.image} alt="" /> : <span className="team-color-image-missing" />}
+        <div><small>{color.categoryLabel} · LV.{color.level} · {color.playerCount}명</small><b>{color.name}</b><p>{color.effects.length ? color.effects.join(" · ") : "효과 정보 없음"}</p></div>
+      </article>)}</div> : <p className="squad-detail-empty">적용 중인 팀컬러 정보가 없습니다.</p>}
+    </section>
+  </div>;
+}
+
+function SquadSection({ nickname, formation, squad, emptyClassName = "profile-empty" }: {
+  nickname: string; formation: string | null; squad: SquadItem[]; emptyClassName?: string;
+}) {
+  const [formationView, setFormationView] = useState(false);
+  const [details, setDetails] = useState<SquadProfileDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError(""); setDetails(null); setFormationView(false);
+    const parameters = new URLSearchParams({ nickname });
+    void fetch(`${apiBaseUrl}/api/users/squad-details?${parameters}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || "스쿼드 상세 정보를 불러오지 못했습니다.");
+        setDetails(payload.profile || null);
+      })
+      .catch((requestError) => { if (!controller.signal.aborted) setError(requestError instanceof Error ? requestError.message : "스쿼드 상세 정보를 불러오지 못했습니다."); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [nickname]);
+
+  return <>
+    <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><div className="squad-heading-tools"><b>{squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={() => setFormationView((current) => !current)} /></div></div>
+    {formationView && details ? <FormationPitch details={details} fallbackFormation={formation} /> : squad.length > 0 ? <div className="squad-grid">{orderedSquad(squad).map((player) => (
+      <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
+    ))}</div> : <div className={emptyClassName}>저장된 선발 스쿼드가 없습니다.</div>}
+    {loading ? <div className="squad-detail-loading">감독과 팀컬러 정보를 확인하고 있습니다.</div> : error ? <div className="squad-detail-loading error">{error}</div> : details ? <SquadSupportDetails details={details} /> : null}
+  </>;
 }
 
 function HistoryChart({ title, items, value, format, formatPoint, frame, change, lowerIsHigher = false }: {
@@ -831,9 +922,7 @@ export default function Home() {
           <aside className="position-panel">
             <div className="position-panel-heading">
               <p>POSITION</p>
-              <button type="button" className={detailedPositions ? "active" : ""} aria-pressed={detailedPositions} onClick={() => void toggleDetailedPositions()}>
-                <span>상세 포지션</span><b>{detailedPositions ? "ON" : "OFF"}</b>
-              </button>
+              <CompactSwitch label="상세 포지션" checked={detailedPositions} onChange={() => void toggleDetailedPositions()} />
             </div>
             <div className="position-grid">
               {!hasSearched ? <p className="position-empty">조회 후 사용할 수 있는 포지션이 표시됩니다.</p> : availablePositions.length > 0 ? availablePositions.map((item) => (
@@ -921,10 +1010,7 @@ export default function Home() {
             </div>
 
             <div className="profile-block">
-              <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{profileResult.squad.length}명</b></div>
-              {profileResult.squad.length > 0 ? <div className="squad-grid">{orderedSquad(profileResult.squad).map((player) => (
-                <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
-              ))}</div> : <div className="profile-empty">저장된 선발 스쿼드가 없습니다.</div>}
+              <SquadSection nickname={profileResult.profile.nickname} formation={profileResult.profile.formation} squad={profileResult.squad} />
             </div>
 
             <div className="profile-block match-block">
@@ -967,10 +1053,10 @@ export default function Home() {
           </div>
           <div className="ranking-controls">
             <form className="ranking-search" onSubmit={searchRanking}>
-              <NicknameAutocomplete id="ranking-nickname" label="구단주 닉네임 검색" value={rankingNickname} onChange={setRankingNickname} />
+              <NicknameAutocomplete id="ranking-nickname" label="구단주 닉네임 검색" value={rankingNickname} onChange={setRankingNickname} clearable onClear={() => void fetchRankings(rankingTeam, 1)} />
             </form>
             <div className="ranking-filter">
-              <TeamAutocomplete id="ranking-team-color" label="팀컬러 필터" value={rankingTeam} options={teamColorNames} onChange={setRankingTeam} onSelect={(nextTeam) => { setRankingNickname(""); void fetchRankings(nextTeam, 1); }} />
+              <TeamAutocomplete id="ranking-team-color" label="팀컬러 필터" value={rankingTeam} options={teamColorNames} onChange={setRankingTeam} onSelect={(nextTeam) => { setRankingNickname(""); void fetchRankings(nextTeam, 1); }} clearable onClear={() => { setRankingNickname(""); void fetchRankings("", 1); }} />
             </div>
           </div>
         </div>
@@ -1085,10 +1171,7 @@ export default function Home() {
                   )}
                   {modalTab === "squad" && (
                     <div className="modal-content-block">
-                      <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3></div><b>{modalProfile.squad.length}명</b></div>
-                      {modalProfile.squad.length > 0 ? <div className="squad-grid">{orderedSquad(modalProfile.squad).map((player) => (
-                        <article className={`position-${positionGroup(player.position)}`} key={`${player.slot}-${player.spid}`}><span>{player.position || "—"}</span><PlayerImage spid={player.spid} name={player.name || "선수"} preserveSpace /><div><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b><small className="squad-season"><SeasonBadge season={player.season} image={player.seasonImage} /><span>+{player.grade}</span></small></div></article>
-                      ))}</div> : <div className="modal-state">저장된 선발 스쿼드가 없습니다.</div>}
+                      <SquadSection nickname={modalProfile.profile.nickname} formation={modalProfile.profile.formation} squad={modalProfile.squad} emptyClassName="modal-state" />
                     </div>
                   )}
                   {modalTab === "matches" && (
