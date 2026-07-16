@@ -117,11 +117,17 @@ function aggregateHistory(items: HistoryItem[], frame: HistoryFrame) {
   return [...buckets.values()];
 }
 
-function historyPointLabel(value: string | undefined, frame: HistoryFrame) {
+function historyTooltipLabel(value: string | undefined) {
   if (!value) return "시간 정보 없음";
-  if (frame === "hour") return simpleSnapshotLabel(value);
-  const label = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" }).format(new Date(value));
-  return frame === "week" ? `${label} 주` : label;
+  return `${new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(value))} 데이터`;
 }
 
 function clubValueLabel(value: string | null) {
@@ -225,16 +231,54 @@ function SeasonBadge({ season, image }: { season: string | null; image: string |
 function HistoryChart({ title, items, value, format, frame }: {
   title: string; items: HistoryItem[]; value: (item: HistoryItem) => number | null; format: (item: HistoryItem) => string; frame: HistoryFrame;
 }) {
-  const points = items.map(value).filter((item): item is number => item != null && Number.isFinite(item));
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const chartItems = items.map((item) => ({ item, point: value(item) }))
+    .filter((entry): entry is { item: HistoryItem; point: number } => entry.point != null && Number.isFinite(entry.point));
+  const points = chartItems.map((entry) => entry.point);
   if (points.length < 2) return <div className="history-chart empty"><h4>{title}</h4><p>변화를 보여줄 기록이 아직 부족합니다.</p></div>;
   const min = Math.min(...points);
   const max = Math.max(...points);
-  const coordinates = points.map((point, index) => {
+  const coordinates = chartItems.map(({ point }, index) => {
     const x = 8 + (index / Math.max(points.length - 1, 1)) * 284;
     const y = max === min ? 70 : 130 - ((point - min) / (max - min)) * 110;
-    return `${x},${y}`;
-  }).join(" ");
-  return <div className="history-chart"><div><h4>{title}</h4><strong>{format(items.at(-1)!)}</strong></div><svg viewBox="0 0 300 140" role="img" aria-label={`${title} 변화`}><polyline points={coordinates} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg><small>{historyPointLabel(items[0]?.dataTime, frame)} → {historyPointLabel(items.at(-1)?.dataTime, frame)}</small></div>;
+    return { x, y };
+  });
+  const active = activeIndex == null ? null : chartItems[activeIndex];
+  const activeCoordinate = activeIndex == null ? null : coordinates[activeIndex];
+  const line = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
+  return <div className="history-chart" data-frame={frame}>
+    <div><h4>{title}</h4><strong>{format(chartItems.at(-1)!.item)}</strong></div>
+    <div className="history-chart-plot" onMouseLeave={() => setActiveIndex(null)}>
+      <svg viewBox="0 0 300 140" role="img" aria-label={`${title} 변화`}>
+        <polyline points={line} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+        {coordinates.map(({ x, y }, index) => {
+          const label = `${historyTooltipLabel(chartItems[index].item.dataTime)}, ${format(chartItems[index].item)}`;
+          return <circle
+            className={activeIndex === index ? "active" : ""}
+            cx={x}
+            cy={y}
+            fill="currentColor"
+            key={`${chartItems[index].item.dataTime}-${index}`}
+            onBlur={() => setActiveIndex(null)}
+            onClick={() => setActiveIndex(index)}
+            onFocus={() => setActiveIndex(index)}
+            onMouseEnter={() => setActiveIndex(index)}
+            r={activeIndex === index ? 5 : 3.5}
+            role="button"
+            tabIndex={0}
+            aria-label={label}
+          />;
+        })}
+      </svg>
+      {active && activeCoordinate && <div
+        className="history-chart-tooltip"
+        style={{
+          left: `${Math.min(86, Math.max(14, (activeCoordinate.x / 300) * 100))}%`,
+          top: `${(activeCoordinate.y / 140) * 100}%`,
+        }}
+      ><span>{historyTooltipLabel(active.item.dataTime)}</span><b>{format(active.item)}</b></div>}
+    </div>
+  </div>;
 }
 
 export default function Home() {

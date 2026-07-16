@@ -193,7 +193,14 @@ a { color: inherit; text-decoration: none; }
 .history-frame-toggle button.active { background: var(--ink); color: var(--lime); }
 .history-chart { background: var(--paper); border: 1px solid var(--line); color: var(--green); min-height: 250px; padding: 22px; }
 .history-chart > div { align-items: start; display: flex; justify-content: space-between; }.history-chart h4 { color: var(--ink); font-size: 17px; margin: 0; }.history-chart strong { color: var(--ink); font-size: 15px; }
-.history-chart svg { display: block; height: 140px; margin: 15px 0 5px; width: 100%; }.history-chart > small { color: var(--muted); font-size: 10px; }.history-chart.empty { color: var(--muted); }.history-chart.empty p { font-size: 13px; line-height: 1.6; margin-top: 55px; }
+.history-chart-plot { height: 160px; margin-top: 15px; position: relative; }
+.history-chart-plot svg { display: block; height: 140px; overflow: visible; width: 100%; }
+.history-chart-plot circle { cursor: pointer; outline: none; stroke: var(--paper); stroke-width: 2; transition: r .12s ease, fill .12s ease; }
+.history-chart-plot circle:hover, .history-chart-plot circle:focus, .history-chart-plot circle.active { fill: var(--lime); stroke: var(--green); }
+.history-chart-tooltip { background: var(--ink); color: var(--paper); display: grid; gap: 4px; min-width: 136px; padding: 8px 10px; pointer-events: none; position: absolute; transform: translate(-50%, calc(-100% - 10px)); white-space: nowrap; z-index: 5; }
+.history-chart-tooltip span { color: rgba(244,243,237,.65); font-size: 11px; }
+.history-chart-tooltip b { color: var(--lime); font-family: var(--font-geist-mono); font-size: 13px; }
+.history-chart.empty { color: var(--muted); }.history-chart.empty p { font-size: 13px; line-height: 1.6; margin-top: 55px; }
 .profile-block { background: var(--paper); border: 1px solid var(--line); padding: 28px; }
 .profile-block-heading { align-items: end; border-bottom: 1px solid var(--ink); display: flex; justify-content: space-between; margin-bottom: 22px; padding-bottom: 18px; }.profile-block-heading span { color: var(--green); font-family: var(--font-geist-mono); font-size: 12px; font-weight: 800; letter-spacing: .1em; }.profile-block-heading h3 { font-size: 27px; margin: 7px 0 0; }.profile-block-heading > b { font-size: 14px; }
 .squad-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
