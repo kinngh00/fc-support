@@ -312,7 +312,7 @@ a { color: inherit; text-decoration: none; }
 .formation-view-title { align-items: center; display: flex; justify-content: space-between; }
 .formation-view-title span { color: var(--green); font-family: var(--font-geist-mono); font-size: 16px; font-weight: 800; letter-spacing: .12em; }
 .formation-view-title b { font-size: 18px; }
-.formation-pitch { aspect-ratio: 1.52 / 1; background: linear-gradient(rgba(17,21,18,.06), rgba(17,21,18,.06)), repeating-linear-gradient(90deg, #327c47 0, #327c47 12.5%, #377f4a 12.5%, #377f4a 25%); border: 6px solid var(--ink); box-shadow: inset 0 0 0 1px rgba(244,243,237,.18), 0 14px 32px rgba(17,21,18,.1); margin: 0 auto; max-height: 650px; max-width: 980px; overflow: hidden; position: relative; width: 100%; }
+.formation-pitch { aspect-ratio: 1.28 / 1; background: linear-gradient(rgba(17,21,18,.06), rgba(17,21,18,.06)), repeating-linear-gradient(90deg, #327c47 0, #327c47 12.5%, #377f4a 12.5%, #377f4a 25%); border: 6px solid var(--ink); box-shadow: inset 0 0 0 1px rgba(244,243,237,.18), 0 14px 32px rgba(17,21,18,.1); margin: 0 auto; max-height: 770px; max-width: 980px; overflow: hidden; position: relative; width: 100%; }
 .formation-pitch::before { border: 2px solid rgba(244,243,237,.76); content: ""; inset: 3.5%; pointer-events: none; position: absolute; }
 .pitch-halfway { background: rgba(244,243,237,.76); height: 2px; left: 3.5%; position: absolute; right: 3.5%; top: 50%; }
 .pitch-circle { border: 2px solid rgba(244,243,237,.76); border-radius: 50%; height: 20%; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); width: 13%; }

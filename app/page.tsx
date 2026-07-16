@@ -348,39 +348,63 @@ function CompactSwitch({ label, checked, onChange, disabled = false, showStateTe
 }
 
 function FormationPitch({ details, fallbackFormation }: { details: SquadProfileDetails; fallbackFormation: string | null }) {
-  const horizontalOrder: Record<string, number> = {
-    LWB: 0, LB: 0, LDM: 0, LM: 0, LAM: 0, LW: 0,
-    LF: 1, LS: 1, LCB: 1, LCM: 1,
-    GK: 2, SW: 2, CB: 2, CDM: 2, CM: 2, CAM: 2, CF: 2, ST: 2,
-    RF: 3, RS: 3, RCB: 3, RCM: 3,
-    RWB: 4, RB: 4, RDM: 4, RM: 4, RAM: 4, RW: 4,
+  const desiredPositions: Record<string, { left: number; bottom: number; line: number }> = {
+    GK: { left: 50, bottom: 6, line: 0 }, SW: { left: 50, bottom: 24, line: 1 },
+    LWB: { left: 8, bottom: 30, line: 1 }, LB: { left: 12, bottom: 27, line: 1 }, LCB: { left: 35, bottom: 30, line: 1 },
+    CB: { left: 50, bottom: 29, line: 1 }, RCB: { left: 65, bottom: 30, line: 1 }, RB: { left: 88, bottom: 27, line: 1 }, RWB: { left: 92, bottom: 30, line: 1 },
+    LDM: { left: 35, bottom: 48, line: 2 }, CDM: { left: 50, bottom: 47, line: 2 }, RDM: { left: 65, bottom: 48, line: 2 },
+    LM: { left: 13, bottom: 53, line: 2 }, LCM: { left: 35, bottom: 54, line: 2 }, CM: { left: 50, bottom: 54, line: 2 }, RCM: { left: 65, bottom: 54, line: 2 }, RM: { left: 87, bottom: 53, line: 2 },
+    LAM: { left: 27, bottom: 70, line: 3 }, CAM: { left: 50, bottom: 73, line: 3 }, RAM: { left: 73, bottom: 70, line: 3 },
+    LW: { left: 12, bottom: 86, line: 4 }, LF: { left: 29, bottom: 84, line: 4 }, LS: { left: 38, bottom: 88, line: 4 },
+    ST: { left: 50, bottom: 89, line: 4 }, RS: { left: 62, bottom: 88, line: 4 }, RF: { left: 71, bottom: 84, line: 4 }, RW: { left: 88, bottom: 86, line: 4 }, CF: { left: 50, bottom: 84, line: 4 },
   };
-  const lineForPosition = (position: string | null) => {
-    if (position === "GK") return 0;
-    if (["SW", "LWB", "LB", "LCB", "CB", "RCB", "RB", "RWB"].includes(position || "")) return 1;
-    if (["LDM", "CDM", "RDM", "LM", "LCM", "CM", "RCM", "RM"].includes(position || "")) return 2;
-    if (["LAM", "CAM", "RAM"].includes(position || "")) return 3;
-    return 4;
-  };
-  const lineBottom = [8, 27, 46, 65, 83];
   const layout = new Map<string, { left: number; bottom: number; rowCount: number }>();
-  const lines = new Map<number, typeof details.players>();
-  details.players.forEach((player) => {
-    const line = lineForPosition(player.position);
-    const players = lines.get(line) || [];
-    players.push(player);
-    lines.set(line, players);
+  const lineCounts = new Map<number, number>();
+  const nodes = details.players.map((player, index) => {
+    const desired = desiredPositions[player.position || ""] || { left: 50, bottom: 54, line: 2 };
+    lineCounts.set(desired.line, (lineCounts.get(desired.line) || 0) + 1);
+    return { player, index, desired, left: desired.left, bottom: desired.bottom };
   });
-  lines.forEach((players, line) => {
-    const ordered = [...players].sort((left, right) => {
-      const leftOrder = horizontalOrder[left.position || ""] ?? 2;
-      const rightOrder = horizontalOrder[right.position || ""] ?? 2;
-      return leftOrder - rightOrder;
+  for (let iteration = 0; iteration < 48; iteration += 1) {
+    nodes.forEach((node) => {
+      node.left += (node.desired.left - node.left) * 0.025;
+      node.bottom += (node.desired.bottom - node.bottom) * 0.025;
     });
-    const margin = ordered.length >= 5 ? 10 : 13;
-    ordered.forEach((player, index) => {
-      const left = ordered.length === 1 ? 50 : margin + index * ((100 - margin * 2) / (ordered.length - 1));
-      layout.set(`${player.spid}-${player.position}`, { left, bottom: lineBottom[line], rowCount: ordered.length });
+    for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+        const leftNode = nodes[leftIndex];
+        const rightNode = nodes[rightIndex];
+        const denseLine = Math.max(lineCounts.get(leftNode.desired.line) || 1, lineCounts.get(rightNode.desired.line) || 1);
+        const minimumX = denseLine >= 5 ? 18 : 22;
+        const minimumY = 19;
+        const deltaX = rightNode.left - leftNode.left;
+        const deltaY = rightNode.bottom - leftNode.bottom;
+        const overlapX = minimumX - Math.abs(deltaX);
+        const overlapY = minimumY - Math.abs(deltaY);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        if (overlapX < overlapY) {
+          const direction = deltaX === 0 ? (rightNode.index > leftNode.index ? 1 : -1) : Math.sign(deltaX);
+          const shift = overlapX / 2 + 0.35;
+          leftNode.left -= direction * shift;
+          rightNode.left += direction * shift;
+        } else {
+          const direction = deltaY === 0 ? (rightNode.index > leftNode.index ? 1 : -1) : Math.sign(deltaY);
+          const shift = overlapY / 2 + 0.35;
+          leftNode.bottom -= direction * shift;
+          rightNode.bottom += direction * shift;
+        }
+      }
+    }
+    nodes.forEach((node) => {
+      node.left = Math.max(10, Math.min(90, node.left));
+      node.bottom = Math.max(5, Math.min(87, node.bottom));
+    });
+  }
+  nodes.forEach((node) => {
+    layout.set(`${node.player.spid}-${node.player.position}`, {
+      left: node.left,
+      bottom: node.bottom,
+      rowCount: lineCounts.get(node.desired.line) || 1,
     });
   });
   return <div className="formation-view">
