@@ -111,6 +111,8 @@ function orderedSquad(items: SquadItem[]) {
   });
 }
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8787";
+const formationViewStorageKey = "fc-support:formation-view";
+const formationViewChangeEvent = "fc-support:formation-view-change";
 
 function seasonLabel(season: string | null) {
   return season?.split(" ")[0] || "시즌 정보 없음";
@@ -463,8 +465,22 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
+    const restoreFormationView = () => setFormationView(window.localStorage.getItem(formationViewStorageKey) === "on");
+    const syncFormationView = (event: Event) => setFormationView(Boolean((event as CustomEvent<boolean>).detail));
+    const syncStoredFormationView = (event: StorageEvent) => {
+      if (event.key === formationViewStorageKey) restoreFormationView();
+    };
+    restoreFormationView();
+    window.addEventListener(formationViewChangeEvent, syncFormationView);
+    window.addEventListener("storage", syncStoredFormationView);
+    return () => {
+      window.removeEventListener(formationViewChangeEvent, syncFormationView);
+      window.removeEventListener("storage", syncStoredFormationView);
+    };
+  }, []);
+  useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError(""); setDetails(null); setFormationView(false);
+    setLoading(true); setError(""); setDetails(null);
     const parameters = new URLSearchParams({ nickname });
     void fetch(`${apiBaseUrl}/api/users/squad-details?${parameters}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
@@ -483,8 +499,14 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
     return (leftIndex === -1 ? positionPriority.length : leftIndex) - (rightIndex === -1 ? positionPriority.length : rightIndex);
   }) : [];
 
+  const toggleFormationView = () => {
+    const next = !formationView;
+    window.localStorage.setItem(formationViewStorageKey, next ? "on" : "off");
+    window.dispatchEvent(new CustomEvent<boolean>(formationViewChangeEvent, { detail: next }));
+  };
+
   return <>
-    <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3><small className="squad-adaptation-note">모든 선수는 적응도 5로 표시됩니다.</small></div><div className="squad-heading-tools"><b>{details?.players.length ?? squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={() => setFormationView((current) => !current)} /></div></div>
+    <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3><small className="squad-adaptation-note">모든 선수는 적응도 5로 표시됩니다.</small></div><div className="squad-heading-tools"><b>{details?.players.length ?? squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={toggleFormationView} /></div></div>
     {formationView && details ? <FormationPitch details={details} fallbackFormation={formation} /> : detailedSquad.length > 0 ? <div className="squad-grid squad-grid-detailed">{detailedSquad.map((player) => (
       <article className={`position-${positionGroup(player.position)}`} key={`${player.spid}-${player.position}`}>
         <div className="squad-card-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
