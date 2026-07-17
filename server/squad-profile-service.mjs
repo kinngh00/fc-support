@@ -1,6 +1,6 @@
 import { db, getActiveSnapshot } from "./database.mjs";
 import { inferFormation } from "./formation.mjs";
-import { fetchPlayerLastRecordedPrice, PRICE_SOURCE_KIND } from "./player-price-source.mjs";
+import { fetchSquadMakerProfile, SQUAD_MAKER_SOURCE_KIND } from "./squad-maker-source.mjs";
 
 const PROFILE_ROOT = "https://fconline.nexon.com";
 const allowedImageHosts = new Set([
@@ -140,17 +140,6 @@ function latestMatchProfile(snapshotId, rankerId, matchId, profile) {
   };
 }
 
-async function enrichPlayerPrices(profile) {
-  return {
-    ...profile,
-    priceSourceKind: PRICE_SOURCE_KIND,
-    players: await Promise.all(profile.players.map(async (player) => ({
-      ...player,
-      price: await fetchPlayerLastRecordedPrice(player.spid, player.grade),
-    }))),
-  };
-}
-
 async function fetchCoachProfile(nexonSn) {
   const profileUrl = `${PROFILE_ROOT}/profile/squad/popup/${encodeURIComponent(nexonSn)}`;
   const profileHtml = await fetchText(profileUrl, {
@@ -196,13 +185,12 @@ export async function getSquadProfile(nickname) {
   `).get(snapshot.id, ranker.id);
   if (cached) {
     const cachedProfile = JSON.parse(cached.payload_json);
-    const needsLatestMatchPlayers = cachedProfile.sourceKind !== "latest-manager-match-coach-only"
+    const needsLatestMatchPlayers = cachedProfile.sourceKind !== SQUAD_MAKER_SOURCE_KIND
       || cachedProfile.sourceMatchId !== (ranker.match_id || null);
-    const needsLatestMatchPrices = cachedProfile.priceSourceKind !== PRICE_SOURCE_KIND;
-    const needsDetailedPlayers = needsLatestMatchPlayers || needsLatestMatchPrices;
-    if (needsDetailedPlayers) {
+    if (needsLatestMatchPlayers) {
       const coachProfile = await fetchCoachProfile(ranker.nexon_sn);
-      const profile = await enrichPlayerPrices(enrichPlayerMetadata(latestMatchProfile(snapshot.id, ranker.id, ranker.match_id, coachProfile)));
+      const matchProfile = enrichPlayerMetadata(latestMatchProfile(snapshot.id, ranker.id, ranker.match_id, coachProfile));
+      const profile = await fetchSquadMakerProfile(matchProfile);
       db.prepare(`UPDATE squad_profile_cache SET payload_json = ?, fetched_at = ? WHERE snapshot_id = ? AND ranker_id = ?`)
         .run(JSON.stringify(profile), new Date().toISOString(), snapshot.id, ranker.id);
       return { snapshot, profile, cached: false };
@@ -216,7 +204,8 @@ export async function getSquadProfile(nickname) {
   }
 
   const coachProfile = await fetchCoachProfile(ranker.nexon_sn);
-  const profile = await enrichPlayerPrices(enrichPlayerMetadata(latestMatchProfile(snapshot.id, ranker.id, ranker.match_id, coachProfile)));
+  const matchProfile = enrichPlayerMetadata(latestMatchProfile(snapshot.id, ranker.id, ranker.match_id, coachProfile));
+  const profile = await fetchSquadMakerProfile(matchProfile);
   db.prepare(`
     INSERT OR REPLACE INTO squad_profile_cache (snapshot_id, ranker_id, payload_json, fetched_at)
     VALUES (?, ?, ?, ?)
