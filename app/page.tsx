@@ -355,7 +355,6 @@ function PlayerMetaBadges({ player }: { player: SquadProfileDetails["players"][n
   return <>
     <EnhancementBadge grade={player.grade} />
     <SeasonBadge season={player.season} image={player.seasonImage} />
-    <TeamColorBadge color={player.affiliationTeamColor} label="소속 팀컬러" />
     <TeamColorBadge color={player.featureTeamColor} label="특성 팀컬러" />
     <NationBadge name={player.nationName} image={player.nationImage} />
   </>;
