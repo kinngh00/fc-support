@@ -328,7 +328,7 @@ function PlayerImage({ spid, name, wrapperClassName = "" }: {
 function SeasonBadge({ season, image }: { season: string | null; image: string | null }) {
   const label = season || "시즌 정보 없음";
   return (
-    <span className="season-badge player-meta-badge" data-tooltip={`시즌: ${label}`} title={`시즌: ${label}`} tabIndex={0}>
+    <span className="season-badge player-meta-badge" data-tooltip={label} title={label} tabIndex={0}>
       {image ? <img src={image} alt={`${label} 시즌`} /> : <span>{seasonLabel(season)}</span>}
     </span>
   );
@@ -341,13 +341,13 @@ function EnhancementBadge({ grade }: { grade: number }) {
 
 function TeamColorBadge({ color, label }: { color: PlayerTeamColor; label: "소속 팀컬러" | "특성 팀컬러" }) {
   if (!color) return null;
-  const tooltip = `${label}: ${color.name}`;
+  const tooltip = color.name;
   return <span className="player-meta-badge team-color-badge" data-tooltip={tooltip} title={tooltip} tabIndex={0}><img src={color.image} alt={`${color.name} ${label}`} /></span>;
 }
 
 function NationBadge({ name, image }: { name: string | null; image: string | null }) {
   if (!name || !image) return null;
-  const tooltip = `국적: ${name}`;
+  const tooltip = name;
   return <span className="player-meta-badge nation-badge" data-tooltip={tooltip} title={tooltip} tabIndex={0}><img src={image} alt={`${name} 국기`} /></span>;
 }
 
