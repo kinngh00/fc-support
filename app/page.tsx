@@ -327,8 +327,9 @@ function PlayerImage({ spid, name, wrapperClassName = "" }: {
 
 function SeasonBadge({ season, image }: { season: string | null; image: string | null }) {
   const label = season || "시즌 정보 없음";
+  const tooltip = seasonLabel(season);
   return (
-    <span className="season-badge player-meta-badge" data-tooltip={label} title={label} tabIndex={0}>
+    <span className="season-badge player-meta-badge" data-tooltip={tooltip} title={tooltip} tabIndex={0}>
       {image ? <img src={image} alt={`${label} 시즌`} /> : <span>{seasonLabel(season)}</span>}
     </span>
   );
