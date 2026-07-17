@@ -1,4 +1,5 @@
 import { db, getActiveSnapshot } from "./database.mjs";
+import { inferFormation } from "./formation.mjs";
 
 const PROFILE_ROOT = "https://fconline.nexon.com";
 const allowedImageHosts = new Set([
@@ -108,6 +109,7 @@ function latestMatchProfile(snapshotId, rankerId, matchId, profile) {
 
   return {
     ...profile,
+    formation: inferFormation(matchPlayers.map((player) => player.position)),
     sourceKind: "latest-manager-match-coach-only",
     sourceMatchId: matchId || null,
     players: matchPlayers.map((matchPlayer) => {

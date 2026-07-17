@@ -1,4 +1,5 @@
 import { db, getActiveSnapshot } from "./database.mjs";
+import { inferFormation } from "./formation.mjs";
 
 const groupedPositionMembers = {
   CB: ["LCB", "CB", "RCB"],
@@ -29,7 +30,7 @@ function rankingItem(row) {
     primaryTeamColor: row.primary_team_color,
     teamImage: row.team_image,
     teamColorCount: row.team_color_count == null ? null : Number(row.team_color_count),
-    formation: row.formation,
+    formation: inferFormation(String(row.position_names || "").split("|").filter(Boolean)),
     currentGrade: row.current_grade,
     bestGrade: row.best_grade,
     previousGrade: row.previous_grade,
@@ -78,7 +79,7 @@ export function getUserProfile(nickname) {
       CAST(e.club_value AS TEXT) AS club_value,
       e.elo, e.win_rate, e.wins, e.draws, e.losses,
       e.team_colors_json, e.primary_team_color, e.team_color_count,
-      e.formation, e.current_grade, e.best_grade, e.previous_grade,
+      e.current_grade, e.best_grade, e.previous_grade,
       asset.image_url AS team_image,
       e.lineup_status
     FROM ranking_entries e
@@ -122,7 +123,11 @@ export function getUserProfile(nickname) {
 
   return {
     snapshot,
-    profile: { ...rankingItem(row), hasOuid: Boolean(row.ouid) },
+    profile: {
+      ...rankingItem(row),
+      formation: inferFormation(squad.map((player) => player.position)),
+      hasOuid: Boolean(row.ouid),
+    },
     history,
     squad,
   };
@@ -275,9 +280,13 @@ export function listRankings({ rankStart, rankEnd, teamColor, offset, limit }) {
       CAST(page.club_value AS TEXT) AS club_value,
       page.elo, page.win_rate, page.wins, page.draws, page.losses,
       page.team_colors_json, page.primary_team_color, page.team_color_count,
-      page.formation, page.current_grade, page.best_grade, page.previous_grade,
+      page.current_grade, page.best_grade, page.previous_grade,
       asset.image_url AS team_image,
       page.lineup_status,
+      (SELECT GROUP_CONCAT(pos.name, '|')
+        FROM lineup_players l
+        JOIN position_metadata pos ON pos.position_id = l.position_id
+        WHERE l.snapshot_id = page.snapshot_id AND l.ranker_id = page.ranker_id) AS position_names,
       (SELECT h.rank FROM ranking_history h
         WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
         ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_rank,
@@ -319,9 +328,13 @@ export function searchRankings({ nickname, limit = 20 }) {
       CAST(page.club_value AS TEXT) AS club_value,
       page.elo, page.win_rate, page.wins, page.draws, page.losses,
       page.team_colors_json, page.primary_team_color, page.team_color_count,
-      page.formation, page.current_grade, page.best_grade, page.previous_grade,
+      page.current_grade, page.best_grade, page.previous_grade,
       asset.image_url AS team_image,
       page.lineup_status,
+      (SELECT GROUP_CONCAT(pos.name, '|')
+        FROM lineup_players l
+        JOIN position_metadata pos ON pos.position_id = l.position_id
+        WHERE l.snapshot_id = page.snapshot_id AND l.ranker_id = page.ranker_id) AS position_names,
       (SELECT h.rank FROM ranking_history h
         WHERE h.ranker_id = page.ranker_id AND datetime(h.data_time) < datetime(?)
         ORDER BY datetime(h.data_time) DESC LIMIT 1) AS previous_rank,

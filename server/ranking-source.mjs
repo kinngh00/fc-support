@@ -70,7 +70,6 @@ export function parseRankingHtml(html) {
       teamColors,
       primaryTeamColor: teamColors[0]?.name || null,
       teamColorCount: teamColors[0]?.count || null,
-      formation: decodeHtml(row.match(/<span class="td formation">([\s\S]*?)<\/span>/i)?.[1] || "") || null,
       currentGrade: gradeCode(row.match(/<span class="td rank_coach">([\s\S]*?)<span class="td rank_r_win_point">/i)?.[1] || ""),
       bestGrade: bestIcons[0] || null,
       previousGrade: bestIcons[1] || null,

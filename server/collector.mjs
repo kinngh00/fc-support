@@ -183,7 +183,7 @@ function storeRankings(snapshotId, rankings) {
         JSON.stringify(ranking.teamColors),
         ranking.primaryTeamColor,
         ranking.teamColorCount,
-        ranking.formation,
+        null,
         ranking.currentGrade,
         ranking.bestGrade,
         ranking.previousGrade,
