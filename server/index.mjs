@@ -7,7 +7,6 @@ import { startScheduler } from "./scheduler.mjs";
 import { listLogs, logger } from "./logger.mjs";
 import { inspectSnapshotFreshness } from "./freshness.mjs";
 import { listRecentMatches } from "./match-service.mjs";
-import { getPlayerImageUrl } from "./player-image-service.mjs";
 import { getSquadProfile } from "./squad-profile-service.mjs";
 
 function send(response, status, payload) {
@@ -50,20 +49,6 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/team-colors") {
       return send(response, 200, listTeamColors());
-    }
-
-    const playerImageMatch = request.method === "GET" && url.pathname.match(/^\/api\/players\/(\d+)\/image$/);
-    if (playerImageMatch) {
-      const spid = Number.parseInt(playerImageMatch[1], 10);
-      if (!Number.isSafeInteger(spid) || spid <= 0) throw new Error("A valid spid is required.");
-      const imageUrl = await getPlayerImageUrl(spid);
-      response.writeHead(302, {
-        location: imageUrl,
-        "cache-control": "public, max-age=86400",
-        "access-control-allow-origin": config.frontendOrigin,
-        vary: "origin",
-      });
-      return response.end();
     }
 
     if (request.method === "GET" && url.pathname === "/api/positions") {

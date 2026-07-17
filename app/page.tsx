@@ -308,21 +308,10 @@ function HistoryFrameToggle({ value, onChange }: { value: HistoryFrame; onChange
   </div>;
 }
 
-function PlayerImage({ spid, name, directImage = null, wrapperClassName = "", preserveSpace = false }: {
+function PlayerImage({ wrapperClassName = "" }: {
   spid: string; name: string; directImage?: string | null; wrapperClassName?: string; preserveSpace?: boolean;
 }) {
-  const [source, setSource] = useState<"direct" | "official" | "legacy" | "player" | "missing">(directImage ? "direct" : "official");
-  const pid = spid.slice(-6);
-  const image = source === "direct" ? directImage : source === "official"
-    ? `${apiBaseUrl}/api/players/${spid}/image`
-    : source === "legacy" ? `https://fo4.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${pid}_25.png`
-    : source === "player" ? `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${spid}.png`
-    : `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/not_found.png`;
-  const content = source === "missing"
-    ? <img alt={`${name} 선수 이미지 없음`} src={image} />
-    : <img alt={`${name} 선수 이미지`} src={image || ""} onError={() => setSource((current) => current === "direct" ? "official" : current === "official" ? "legacy" : current === "legacy" ? "player" : "missing")} />;
-  if (wrapperClassName) return <div className={`${wrapperClassName} ${source === "missing" ? "missing" : ""}`}>{content}</div>;
-  return content;
+  return wrapperClassName ? <div className={wrapperClassName} aria-hidden="true" /> : null;
 }
 
 function SeasonBadge({ season, image }: { season: string | null; image: string | null }) {
