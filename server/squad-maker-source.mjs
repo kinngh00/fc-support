@@ -1,6 +1,8 @@
+import { nationName } from "./nation-metadata.mjs";
+
 const SQUAD_MAKER_ENDPOINT = "https://fconline.nexon.com/squadmakerapi/SquadMakerProc";
 
-export const SQUAD_MAKER_SOURCE_KIND = "squad-maker-sync-no-session";
+export const SQUAD_MAKER_SOURCE_KIND = "squad-maker-sync-no-session-v2";
 
 const defaultTeamStrategy = {
   defensivestyle: 1,
@@ -45,6 +47,13 @@ function nationImage(nationId) {
   return nationId == null || nationId === ""
     ? null
     : `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/countries/largeflags/f_${nationId}.png`;
+}
+
+function playerTeamColor(value) {
+  const name = String(value?.name || "").trim();
+  const image = String(value?.image || "").trim();
+  if (!name || !image) return null;
+  return { id: String(value.id || ""), name, image };
 }
 
 export function squadMakerRequestBody(profile) {
@@ -106,13 +115,16 @@ export function normalizeSquadMakerResponse(profile, payload) {
     return {
       ...player,
       name: String(detail.name || player.name || "").trim() || null,
-      season: String(detail.season || player.season || "").trim() || null,
+      season: String(player.season || detail.season || "").trim() || null,
       image: playerImage(detail.thumb_custom || detail.thumb),
       ovr: Number.isFinite(Number(detail.ovr)) ? Number(detail.ovr) : null,
       pay: Number.isFinite(Number(detail.pay)) ? Number(detail.pay) : null,
       price,
       nationId,
+      nationName: nationName(nationId),
       nationImage: nationImage(nationId),
+      affiliationTeamColor: playerTeamColor(detail.teamColor?.teamColor1),
+      featureTeamColor: playerTeamColor(detail.teamColor?.teamColor2),
     };
   });
   const teamColors = Object.entries(teamColorCategories).flatMap(([category, categoryLabel]) =>
@@ -129,6 +141,7 @@ export function normalizeSquadMakerResponse(profile, payload) {
       }).filter(Boolean),
       image: String(color?.image || "").trim() || null,
       playerCount: numberOr(color?.playercnt, Array.isArray(color?.playerlist) ? color.playerlist.length : 0),
+      playerSpids: (Array.isArray(color?.playerlist) ? color.playerlist : []).map((spid) => String(spid)),
     })).filter((color) => color.name),
   );
   return {

@@ -48,6 +48,10 @@ const successfulPayload = {
         pay: 28,
         price: "35,600,000,000,000,000",
         nationImg: 52,
+        teamColor: {
+          teamColor1: { id: 1005, name: "맨체스터 유나이티드", image: "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/crests/light/medium/l11.png" },
+          teamColor2: { id: 40577, name: "레드데블스 전설의 듀오", image: "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/teamcolorboost/icon/medium/4_l11.png" },
+        },
       }],
       totalTeamColor: {
         affiliation: {
@@ -59,7 +63,16 @@ const successfulPayload = {
             playercnt: 11,
           },
         },
-        feature: {},
+        feature: {
+          40577: {
+            lv: 1,
+            name: "레드데블스 전설의 듀오",
+            skill: [{ type: "가속력", value: 1 }],
+            image: "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/teamcolorboost/icon/medium/4_l11.png",
+            playercnt: 2,
+            playerlist: [852230025, 850226764],
+          },
+        },
         enhance: {},
       },
     },
@@ -107,6 +120,17 @@ test("applies player details and active team colors from the response", () => {
   assert.equal(result.players[0].pay, 28);
   assert.equal(result.players[0].price, "35600000000000000");
   assert.equal(result.players[0].nationId, "52");
+  assert.equal(result.players[0].nationName, "아르헨티나");
+  assert.deepEqual(result.players[0].affiliationTeamColor, {
+    id: "1005",
+    name: "맨체스터 유나이티드",
+    image: "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/crests/light/medium/l11.png",
+  });
+  assert.deepEqual(result.players[0].featureTeamColor, {
+    id: "40577",
+    name: "레드데블스 전설의 듀오",
+    image: "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/teamcolorboost/icon/medium/4_l11.png",
+  });
   assert.equal(result.players[0].image, "https://fo4.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p239301_25.png?rd=202607170350");
   assert.deepEqual(result.teamColors[0], {
     id: "1005",
@@ -117,5 +141,7 @@ test("applies player details and active team colors from the response", () => {
     effects: ["전체 능력치 +4"],
     image: "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/crests/light/medium/l11.png",
     playerCount: 11,
+    playerSpids: [],
   });
+  assert.deepEqual(result.teamColors[1].playerSpids, ["852230025", "850226764"]);
 });

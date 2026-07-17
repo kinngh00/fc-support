@@ -62,14 +62,15 @@ type HistoryItem = { dataTime: string; rank: number; clubValue: string; winRate:
 type HistoryFrame = "hour" | "day" | "week";
 type HistoryChange = { label: string; trend: "up" | "down" | "same" };
 type SquadItem = { slot: number; spid: string; grade: number; position: string | null; name: string | null; season: string | null; seasonImage: string | null };
+type PlayerTeamColor = { id: string; name: string; image: string } | null;
 type SquadProfileDetails = {
   formation: string | null;
   adaptation: number;
   sourceKind?: "latest-manager-match";
   sourceMatchId?: string | null;
-  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; seasonImage: string | null; image: string | null; ovr: number | null; pay: number | null; price: string | null; nationId: string | null; nationImage: string | null; x: number; y: number }>;
+  players: Array<{ spid: string; name: string | null; position: string | null; grade: number; season: string | null; seasonImage: string | null; image: string | null; ovr: number | null; pay: number | null; price: string | null; nationId: string | null; nationName: string | null; nationImage: string | null; affiliationTeamColor: PlayerTeamColor; featureTeamColor: PlayerTeamColor; x: number; y: number }>;
   coach: { id: string; name: string; image: string | null; description: string | null; abilities: string[]; formations: string[] } | null;
-  teamColors: Array<{ id: string; category: string; categoryLabel: string; level: number; name: string; effects: string[]; image: string | null; playerCount: number }>;
+  teamColors: Array<{ id: string; category: string; categoryLabel: string; level: number; name: string; effects: string[]; image: string | null; playerCount: number; playerSpids: string[] }>;
 };
 type UserProfileResponse = {
   snapshot: { id: number; data_time: string };
@@ -327,7 +328,7 @@ function PlayerImage({ spid, name, wrapperClassName = "" }: {
 function SeasonBadge({ season, image }: { season: string | null; image: string | null }) {
   const label = season || "시즌 정보 없음";
   return (
-    <span className="season-badge" data-tooltip={`시즌명: ${label}`} title={`시즌명: ${label}`} tabIndex={0}>
+    <span className="season-badge player-meta-badge" data-tooltip={`시즌: ${label}`} title={`시즌: ${label}`} tabIndex={0}>
       {image ? <img src={image} alt={`${label} 시즌`} /> : <span>{seasonLabel(season)}</span>}
     </span>
   );
@@ -335,7 +336,29 @@ function SeasonBadge({ season, image }: { season: string | null; image: string |
 
 function EnhancementBadge({ grade }: { grade: number }) {
   const style = grade <= 1 ? "gray" : grade <= 4 ? "copper" : grade <= 7 ? "silver" : grade <= 10 ? "gold" : "platinum";
-  return <span className={`enhancement-badge enhancement-${style}`} aria-label={`${grade}강`}>+{grade}</span>;
+  return <span className={`enhancement-badge enhancement-${style} player-meta-badge`} aria-label={`${grade}강`} data-tooltip={`강화 단계: ${grade}강`} title={`강화 단계: ${grade}강`} tabIndex={0}>+{grade}</span>;
+}
+
+function TeamColorBadge({ color, label }: { color: PlayerTeamColor; label: "소속 팀컬러" | "특성 팀컬러" }) {
+  if (!color) return null;
+  const tooltip = `${label}: ${color.name}`;
+  return <span className="player-meta-badge team-color-badge" data-tooltip={tooltip} title={tooltip} tabIndex={0}><img src={color.image} alt={`${color.name} ${label}`} /></span>;
+}
+
+function NationBadge({ name, image }: { name: string | null; image: string | null }) {
+  if (!name || !image) return null;
+  const tooltip = `국적: ${name}`;
+  return <span className="player-meta-badge nation-badge" data-tooltip={tooltip} title={tooltip} tabIndex={0}><img src={image} alt={`${name} 국기`} /></span>;
+}
+
+function PlayerMetaBadges({ player }: { player: SquadProfileDetails["players"][number] }) {
+  return <>
+    <EnhancementBadge grade={player.grade} />
+    <SeasonBadge season={player.season} image={player.seasonImage} />
+    <TeamColorBadge color={player.affiliationTeamColor} label="소속 팀컬러" />
+    <TeamColorBadge color={player.featureTeamColor} label="특성 팀컬러" />
+    <NationBadge name={player.nationName} image={player.nationImage} />
+  </>;
 }
 
 function CompactSwitch({ label, checked, onChange, disabled = false, showStateText = true }: {
@@ -427,7 +450,7 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
           <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
           <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="formation-player-image" />
           <b className="formation-player-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
-          <div className="formation-player-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} />{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
+          <div className="formation-player-meta"><PlayerMetaBadges player={player} /></div>
           <div className="formation-player-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
         </article>
         );
@@ -509,10 +532,10 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
     <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3><small className="squad-adaptation-note">모든 선수는 적응도 5로 표시됩니다.</small></div><div className="squad-heading-tools"><b>{details?.players.length ?? squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={toggleFormationView} /></div></div>
     {formationView && details ? <FormationPitch details={details} fallbackFormation={formation} /> : detailedSquad.length > 0 ? <div className="squad-grid squad-grid-detailed">{detailedSquad.map((player) => (
       <article className={`position-${positionGroup(player.position)}`} key={`${player.spid}-${player.position}`}>
-        <div className="squad-card-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
+        <div className="squad-card-heading"><b>{player.position || "—"}</b>{player.ovr != null && <strong>{`OVR ${player.ovr}`}</strong>}</div>
         <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="squad-card-image" />
         <b className="squad-card-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
-        <div className="squad-card-meta"><SeasonBadge season={player.season} image={player.seasonImage} /><EnhancementBadge grade={player.grade} />{player.nationImage && <img src={player.nationImage} alt={`국적 ${player.nationId || ""}`} />}</div>
+        <div className="squad-card-meta"><PlayerMetaBadges player={player} /></div>
         <div className="squad-card-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
       </article>
     ))}</div> : loading ? <div className={emptyClassName}>현재 선발 스쿼드를 불러오고 있습니다.</div> : <div className={emptyClassName}>저장된 선발 스쿼드가 없습니다.</div>}
