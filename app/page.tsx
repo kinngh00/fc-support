@@ -336,7 +336,7 @@ function SeasonBadge({ season, image }: { season: string | null; image: string |
 
 function EnhancementBadge({ grade }: { grade: number }) {
   const style = grade <= 1 ? "gray" : grade <= 4 ? "copper" : grade <= 7 ? "silver" : grade <= 10 ? "gold" : "platinum";
-  return <span className={`enhancement-badge enhancement-${style} player-meta-badge`} aria-label={`${grade}강`} data-tooltip={`강화 단계: ${grade}강`} title={`강화 단계: ${grade}강`} tabIndex={0}>+{grade}</span>;
+  return <span className={`enhancement-badge enhancement-${style} player-meta-badge`} aria-label={`${grade}카`} data-tooltip={`${grade}카`} title={`${grade}카`} tabIndex={0}>+{grade}</span>;
 }
 
 function TeamColorBadge({ color, label }: { color: PlayerTeamColor; label: "소속 팀컬러" | "특성 팀컬러" }) {
