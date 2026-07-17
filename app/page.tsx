@@ -308,10 +308,18 @@ function HistoryFrameToggle({ value, onChange }: { value: HistoryFrame; onChange
   </div>;
 }
 
-function PlayerImage({ wrapperClassName = "" }: {
+function PlayerImage({ spid, name, wrapperClassName = "" }: {
   spid: string; name: string; directImage?: string | null; wrapperClassName?: string; preserveSpace?: boolean;
 }) {
-  return wrapperClassName ? <div className={wrapperClassName} aria-hidden="true" /> : null;
+  const [source, setSource] = useState<"spid" | "pid" | "missing">("spid");
+  const pid = spid.slice(-6).replace(/^0+/, "") || "0";
+  const playerId = source === "spid" ? spid : pid;
+  const content = source === "missing" ? null : <img
+    alt={`${name} 선수 이미지`}
+    src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${playerId}.png`}
+    onError={() => setSource((current) => current === "spid" ? "pid" : "missing")}
+  />;
+  return wrapperClassName ? <div className={`${wrapperClassName} ${source === "missing" ? "missing" : ""}`}>{content}</div> : content;
 }
 
 function SeasonBadge({ season, image }: { season: string | null; image: string | null }) {
