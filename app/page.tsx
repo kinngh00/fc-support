@@ -636,16 +636,6 @@ export default function Home() {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesHasMore, setMatchesHasMore] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchItem | null>(null);
-  const [modalNickname, setModalNickname] = useState("");
-  const [modalProfile, setModalProfile] = useState<UserProfileResponse | null>(null);
-  const [modalMatches, setModalMatches] = useState<MatchItem[]>([]);
-  const [modalSelectedMatch, setModalSelectedMatch] = useState<MatchItem | null>(null);
-  const [modalTab, setModalTab] = useState<"summary" | "squad" | "matches">("summary");
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalError, setModalError] = useState("");
-  const [modalHistoryFrame, setModalHistoryFrame] = useState<HistoryFrame>("hour");
-  const modalRequest = useRef(0);
-  const modalScrollPosition = useRef(0);
   const teamColorNames = teamColors.map((color) => color.name).sort((a, b) => a.localeCompare(b, "ko-KR"));
 
   function scrollToRankingTop() {
@@ -748,49 +738,6 @@ export default function Home() {
     } finally {
       setProfileLoading(false);
     }
-  }
-
-  async function openRankerModal(ranker: RankingItem) {
-    const requestId = ++modalRequest.current;
-    modalScrollPosition.current = window.scrollY;
-    setModalNickname(ranker.nickname);
-    setModalProfile(null);
-    setModalMatches([]);
-    setModalSelectedMatch(null);
-    setModalTab("summary");
-    setModalHistoryFrame("hour");
-    setModalError("");
-    setModalLoading(true);
-    try {
-      const profileParameters = new URLSearchParams({ nickname: ranker.nickname });
-      const profileResponse = await fetch(`${apiBaseUrl}/api/users/profile?${profileParameters}`, { cache: "no-store" });
-      const profilePayload = await profileResponse.json();
-      if (!profileResponse.ok) throw new Error(profilePayload.message || "구단주 정보를 불러오지 못했습니다.");
-      if (modalRequest.current !== requestId) return;
-      setModalProfile(profilePayload);
-
-      if (profilePayload.profile?.hasOuid) {
-        const matchParameters = new URLSearchParams({ nickname: profilePayload.profile.nickname, offset: "0", limit: "20" });
-        const matchResponse = await fetch(`${apiBaseUrl}/api/users/matches?${matchParameters}`, { cache: "no-store" });
-        const matchPayload = await matchResponse.json();
-        if (modalRequest.current !== requestId) return;
-        if (matchResponse.ok) {
-          const items = Array.isArray(matchPayload.items) ? matchPayload.items : [];
-          setModalMatches(items);
-          setModalSelectedMatch(items[0] || null);
-        }
-      }
-    } catch (requestError) {
-      if (modalRequest.current === requestId) setModalError(requestError instanceof Error ? requestError.message : "구단주 정보를 불러오지 못했습니다.");
-    } finally {
-      if (modalRequest.current === requestId) setModalLoading(false);
-    }
-  }
-
-  function closeRankerModal() {
-    modalRequest.current += 1;
-    setModalNickname("");
-    window.requestAnimationFrame(() => window.scrollTo({ top: modalScrollPosition.current, behavior: "auto" }));
   }
 
   async function fetchPicks(nextQuery: Query, offset = 0, append = false) {
@@ -902,20 +849,6 @@ export default function Home() {
     // Nickname changes are the only trigger; ranking/team state is handled inside each request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rankingNickname]);
-
-  useEffect(() => {
-    if (!modalNickname) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRankerModal();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [modalNickname]);
 
   async function applyFilters() {
     setHasSearched(true);
@@ -1173,16 +1106,6 @@ export default function Home() {
                 <article
                   className={`ranking-row ${ranker.rank <= 3 ? "podium" : ""}`}
                   key={`${ranker.rank}-${ranker.nexonSn}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${ranker.nickname} 구단주 정보 보기`}
-                  onClick={() => void openRankerModal(ranker)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      void openRankerModal(ranker);
-                    }
-                  }}
                 >
                   <strong className="ranking-number">{integerLabel(ranker.rank, 2)}<RankDelta current={ranker.rank} previous={ranker.previousRank} /></strong>
                   <div className="ranking-coach">
@@ -1226,71 +1149,6 @@ export default function Home() {
           )}
         </div>
       </section>
-
-      {modalNickname && (
-        <div className="ranker-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRankerModal(); }}>
-          <section className="ranker-modal" role="dialog" aria-modal="true" aria-labelledby="ranker-modal-title">
-            <header className="ranker-modal-header">
-              <div><span>MANAGER PROFILE</span><h2 id="ranker-modal-title">{modalNickname}</h2></div>
-              <button type="button" onClick={closeRankerModal} aria-label="구단주 정보 닫기">×</button>
-            </header>
-            <nav className="ranker-modal-tabs" aria-label="구단주 상세 정보">
-              {([['summary', '요약'], ['squad', '선발 스쿼드'], ['matches', '최근 경기']] as const).map(([tab, label]) => (
-                <button type="button" className={modalTab === tab ? "active" : ""} aria-pressed={modalTab === tab} key={tab} onClick={() => setModalTab(tab)}>{label}</button>
-              ))}
-            </nav>
-            <div className="ranker-modal-body">
-              {modalLoading && !modalProfile ? <div className="modal-state">구단주 정보를 불러오는 중입니다.</div> : modalError ? <div className="modal-state error">{modalError}</div> : modalProfile ? (
-                <>
-                  {modalTab === "summary" && (
-                    <div className="modal-summary-tab">
-                      <div className="modal-manager-summary">
-                        <div><span>{modalProfile.profile.rank.toLocaleString()}위</span><h3>{modalProfile.profile.nickname}</h3><p>{modalProfile.profile.primaryTeamColor || "팀컬러 없음"} · {modalProfile.profile.formation || "포메이션 정보 없음"}</p></div>
-                        <dl>
-                          <div><dt>구단가치</dt><dd>{clubValueLabel(modalProfile.profile.clubValue)}</dd></div>
-                          <div><dt>최근 승률</dt><dd>{modalProfile.profile.winRate == null ? "정보 없음" : `${modalProfile.profile.winRate.toFixed(1)}%`}</dd></div>
-                          <div><dt>경기 기록</dt><dd>{integerLabel(modalProfile.profile.wins)}승 {integerLabel(modalProfile.profile.draws)}무 {integerLabel(modalProfile.profile.losses)}패</dd></div>
-                          <div><dt>점수</dt><dd>{modalProfile.profile.elo?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "정보 없음"}</dd></div>
-                        </dl>
-                      </div>
-                      <div className="history-toolbar"><span>기록 조회 단위</span><HistoryFrameToggle value={modalHistoryFrame} onChange={setModalHistoryFrame} /></div>
-                      <small className="history-navigation-guide">차트를 좌우로 드래그하거나 휠을 움직이면 이전 기록을 볼 수 있습니다.</small>
-                      <div className="history-grid">
-                        <HistoryChart title="순위 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.rank} format={(item) => `${item.rank.toLocaleString()}위`} formatPoint={(point) => `${Math.round(point).toLocaleString()}위`} change={rankHistoryChange} lowerIsHigher />
-                        <HistoryChart title="구단가치 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => Number(BigInt(item.clubValue) / 1_000_000_000_000n)} format={(item) => clubValueLabel(item.clubValue)} formatPoint={historyClubValueLabel} change={clubValueHistoryChange} />
-                        <HistoryChart title="승률 변화" items={aggregateHistory(modalProfile.history, modalHistoryFrame)} frame={modalHistoryFrame} value={(item) => item.winRate} format={(item) => item.winRate == null ? "정보 없음" : `${item.winRate.toFixed(1)}%`} formatPoint={(point) => `${point.toFixed(1)}%`} change={winRateHistoryChange} />
-                      </div>
-                    </div>
-                  )}
-                  {modalTab === "squad" && (
-                    <div className="modal-content-block">
-                      <SquadSection nickname={modalProfile.profile.nickname} formation={modalProfile.profile.formation} squad={modalProfile.squad} emptyClassName="modal-state" />
-                    </div>
-                  )}
-                  {modalTab === "matches" && (
-                    <div className="modal-content-block matches-layout">
-                      <div className="match-list">
-                        {modalMatches.length > 0 ? modalMatches.map((match) => (
-                          <button className={modalSelectedMatch?.matchId === match.matchId ? "selected" : ""} type="button" key={match.matchId} onClick={() => setModalSelectedMatch(match)}>
-                            <span className={`match-result result-${match.self?.result || "없음"}`}>{match.self?.result || "결과 없음"}</span>
-                            <div><b>{match.self?.nickname || modalNickname} {match.self?.score ?? 0} : {match.opponent?.score ?? 0} {match.opponent?.nickname || "상대 정보 없음"}</b><small>{String(match.matchDate || "").replace("T", " ").slice(0, 16)}</small></div>
-                          </button>
-                        )) : <div className="modal-state">최근 감독모드 경기가 없습니다.</div>}
-                      </div>
-                      <div className="match-detail">
-                        {modalSelectedMatch?.self && modalSelectedMatch.opponent ? <>
-                          <div className="match-score"><span>{modalSelectedMatch.self.nickname}</span><strong>{modalSelectedMatch.self.score} : {modalSelectedMatch.opponent.score}</strong><span>{modalSelectedMatch.opponent.nickname}</span></div>
-                          {[["점유율", `${modalSelectedMatch.self.possession}%`, `${modalSelectedMatch.opponent.possession}%`], ["슈팅", modalSelectedMatch.self.shots, modalSelectedMatch.opponent.shots], ["유효 슈팅", modalSelectedMatch.self.effectiveShots, modalSelectedMatch.opponent.effectiveShots], ["패스 성공", `${modalSelectedMatch.self.passSuccess}/${modalSelectedMatch.self.passTry}`, `${modalSelectedMatch.opponent.passSuccess}/${modalSelectedMatch.opponent.passTry}`], ["파울", modalSelectedMatch.self.fouls, modalSelectedMatch.opponent.fouls], ["코너킥", modalSelectedMatch.self.corners, modalSelectedMatch.opponent.corners]].map(([label, selfValue, opponentValue]) => <div className="match-stat" key={String(label)}><b>{selfValue}</b><span>{label}</span><b>{opponentValue}</b></div>)}
-                        </> : <div className="profile-empty">경기를 선택하면 상세 내용이 표시됩니다.</div>}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : null}
-            </div>
-          </section>
-        </div>
-      )}
 
       <section className="community-section" id="community">
         <div><p className="section-kicker">FC-SUPPORT COMMUNITY</p><h2>데이터 다음은,<br />당신의 전술.</h2></div>
