@@ -460,6 +460,7 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
 }
 
 function SquadSupportDetails({ details }: { details: SquadProfileDetails }) {
+  const [hoveredTeamColor, setHoveredTeamColor] = useState<string | null>(null);
   return <div className="squad-support-details">
     <section className="squad-coach-card">
       <div className="squad-detail-heading"><span>MANAGER</span><h4>감독</h4></div>
@@ -472,10 +473,22 @@ function SquadSupportDetails({ details }: { details: SquadProfileDetails }) {
     </section>
     <section className="squad-team-colors">
       <div className="squad-detail-heading"><span>ACTIVE TEAM COLORS</span><h4>적용 팀컬러</h4></div>
-      {details.teamColors.length ? <div className="team-color-detail-list">{details.teamColors.map((color) => <article key={`${color.category}-${color.id}-${color.name}`}>
-        {color.image ? <img src={color.image} alt="" /> : <span className="team-color-image-missing" />}
-        <div><small>{color.categoryLabel} · LV.{color.level} · {color.playerCount}명</small><b>{color.name}</b><p>{color.effects.length ? color.effects.join(" · ") : "효과 정보 없음"}</p></div>
-      </article>)}</div> : <p className="squad-detail-empty">적용 중인 팀컬러 정보가 없습니다.</p>}
+      {details.teamColors.length ? <div className="team-color-detail-list">{details.teamColors.map((color) => {
+        const colorKey = `${color.category}-${color.id}-${color.name}`;
+        const playerSpids = new Set(color.playerSpids.map(String));
+        const appliedPlayers = details.players.filter((player) => {
+          if (playerSpids.size) return playerSpids.has(String(player.spid));
+          if (color.category === "affiliation") return player.affiliationTeamColor?.id === color.id || player.affiliationTeamColor?.name === color.name;
+          if (color.category === "feature") return player.featureTeamColor?.id === color.id || player.featureTeamColor?.name === color.name;
+          return false;
+        });
+        const appliedPlayerNames = appliedPlayers.map((player) => player.name || "선수명 정보 없음");
+        return <article key={colorKey} onMouseEnter={() => setHoveredTeamColor(colorKey)} onMouseLeave={() => setHoveredTeamColor(null)}>
+          {color.image ? <img src={color.image} alt="" /> : <span className="team-color-image-missing" />}
+          <div><small>{color.categoryLabel} · LV.{color.level} · {color.playerCount}명</small><b>{color.name}</b><p>{color.effects.length ? color.effects.join(" · ") : "효과 정보 없음"}</p></div>
+          <div className={`team-color-applied-tooltip ${hoveredTeamColor === colorKey ? "visible" : ""}`}><span>적용 선수</span><p>{appliedPlayerNames.length ? appliedPlayerNames.join(" · ") : "적용 선수 정보 없음"}</p></div>
+        </article>;
+      })}</div> : <p className="squad-detail-empty">적용 중인 팀컬러 정보가 없습니다.</p>}
     </section>
   </div>;
 }
