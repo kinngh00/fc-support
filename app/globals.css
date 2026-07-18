@@ -298,6 +298,7 @@ a { color: inherit; text-decoration: none; }
 .squad-grid .squad-season .season-badge > img { height: 20px; max-width: 46px; object-fit: contain; width: auto; }
 .squad-grid .squad-season > span { font-family: var(--font-geist-mono); font-size: 12px; line-height: 20px; }
 .squad-player-image-missing { visibility: hidden; }
+.squad-list-formation { align-items: center; display: flex; justify-content: space-between; margin-bottom: 12px; }.squad-list-formation span { color: var(--green); font-family: var(--font-geist-mono); font-size: 16px; font-weight: 800; letter-spacing: .12em; }.squad-list-formation b { font-size: 18px; }
 .squad-grid-detailed article { column-gap: 0; grid-template-columns: 36px 82px minmax(0,1fr); grid-template-rows: 28px 32px 46px 32px; min-height: 132px; padding: 0; }
 .squad-grid-detailed article > .squad-card-heading { align-items: center; align-self: stretch; background: var(--green); color: #fff; display: flex; flex-direction: column; gap: 10px; grid-column: 1; grid-row: 1 / -1; justify-content: center; min-height: 0; padding: 0; }
 .squad-grid-detailed article.position-defense > .squad-card-heading { background: #1476ff; }.squad-grid-detailed article.position-midfield > .squad-card-heading { background: #03cd7a; }.squad-grid-detailed article.position-attack > .squad-card-heading { background: #f6425f; }
