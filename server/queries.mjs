@@ -250,6 +250,42 @@ export function recentSnapshots(limit = 10) {
   `).all(limit);
 }
 
+export function portfolioMetrics() {
+  const snapshot = getActiveSnapshot();
+  const community = {
+    members: Number(db.prepare("SELECT COUNT(*) AS count FROM community_users").get().count),
+    posts: Number(db.prepare("SELECT COUNT(*) AS count FROM community_posts").get().count),
+    comments: Number(db.prepare("SELECT COUNT(*) AS count FROM community_comments").get().count),
+  };
+  if (!snapshot) return { snapshot: null, collection: null, community };
+
+  const rankingCount = Number(snapshot.ranking_count || 0);
+  const failureCount = Number(snapshot.failure_count || 0);
+  const successfulCount = Math.max(0, rankingCount - failureCount);
+  const startedAt = Date.parse(snapshot.started_at);
+  const completedAt = Date.parse(snapshot.completed_at);
+  const durationSeconds = Number.isFinite(startedAt) && Number.isFinite(completedAt)
+    ? Math.max(0, Math.round((completedAt - startedAt) / 1000))
+    : null;
+
+  return {
+    snapshot: {
+      id: Number(snapshot.id),
+      dataTime: snapshot.data_time,
+      completedAt: snapshot.completed_at,
+    },
+    collection: {
+      rankingCount,
+      lineupCount: Number(snapshot.lineup_count || 0),
+      failureCount,
+      successfulCount,
+      successRate: rankingCount === 0 ? null : Number(((successfulCount / rankingCount) * 100).toFixed(2)),
+      durationSeconds,
+    },
+    community,
+  };
+}
+
 export function listRankings({ rankStart, rankEnd, teamColor, offset, limit }) {
   const snapshot = getActiveSnapshot();
   if (!snapshot) return null;

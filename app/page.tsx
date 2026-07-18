@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState, type CSSProperties } from "react";
 import { CommunitySection, openCommunityAuthEvent } from "./community";
+import { PortfolioSection } from "./portfolio";
 
 type PickItem = {
   spid: string;
@@ -1031,6 +1032,7 @@ export default function Home() {
           <a href="#user-search">구단주 검색</a>
           <a href="#ranking">랭커</a>
           <a href="#community">커뮤니티</a>
+          <a href="#portfolio">프로젝트</a>
         </nav>
         <button className="login-button" type="button" onClick={() => window.dispatchEvent(new Event(openCommunityAuthEvent))}>로그인</button>
       </header>
@@ -1356,6 +1358,8 @@ export default function Home() {
       )}
 
       <CommunitySection />
+
+      <PortfolioSection />
 
       <footer><a className="brand footer-brand" href="#top"><span className="brand-mark">FC</span><span>SUPPORT</span></a><p>Data based on NEXON Open API</p><small>FC-SUPPORT is not associated with or endorsed by NEXON Korea.</small></footer>
     </main>

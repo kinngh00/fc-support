@@ -6,6 +6,13 @@ FC-SUPPORT는 포트폴리오를 목적으로 시작했지만, 실제 운영을 
 
 데이터는 임의로 생성하지 않습니다. 수집된 실제 데이터가 없거나 조회에 실패하면 `데이터 없음`, `수집 중`, `조회 실패` 상태를 그대로 표시합니다.
 
+## 포트폴리오 빠른 보기
+
+- [시스템 아키텍처·수집 파이프라인·DB ERD](docs/ARCHITECTURE.md)
+- [AI-Native 개발 의사결정과 실제 검증 사례](docs/AI_NATIVE_DEVELOPMENT.md)
+- [채용 담당자를 위한 3분 데모 가이드](docs/DEMO.md)
+- 사이트의 `AI-NATIVE DEVELOPMENT` 영역에서 활성 스냅샷의 실제 수집 지표 확인
+
 ## 핵심 기능
 
 - FC 온라인 공식 홈페이지의 감독모드 랭킹 1~10,000위 수집
@@ -20,6 +27,10 @@ FC-SUPPORT는 포트폴리오를 목적으로 시작했지만, 실제 운영을 
 - 랭킹·구단가치·승률의 30일 시간별 이력 보관
 - 매시 `05분 KST` 자동 갱신
 - 테스트 환경과 운영 환경을 분리한 무중단 배포
+- 회원가입·로그인과 공개 열람, 회원 전용 게시글·댓글 작성
+- 작성자 권한을 서버에서 검증하는 커뮤니티 삭제 기능
+- 활성 스냅샷 기반 수집 인원·처리 성공률·소요 시간 지표
+- GitHub Actions의 Node.js 22 빌드·자동 테스트
 
 ## 픽률 계산
 
@@ -69,6 +80,13 @@ flowchart LR
 | `GET /api/users/suggestions` | 입력 중인 글자로 시작하는 구단주 닉네임 |
 | `GET /api/users/profile` | 구단주의 현재 정보·30일 기록·선발 스쿼드 |
 | `GET /api/users/matches` | 구단주의 최근 감독모드 경기 20개씩 조회 |
+| `GET /api/portfolio/metrics` | 활성 스냅샷의 실제 수집 성능과 커뮤니티 지표 |
+| `GET /api/community/posts` | 공개 게시글 목록 |
+| `GET /api/community/posts/:id` | 공개 게시글과 댓글 상세 |
+| `POST /api/auth/register` | 회원가입과 세션 시작 |
+| `POST /api/auth/login` | 로그인과 세션 시작 |
+| `POST /api/community/posts` | 로그인 회원 게시글 작성 |
+| `POST /api/community/posts/:id/comments` | 로그인 회원 댓글 작성 |
 | `GET /api/logs` | 최근 백엔드 로그 |
 | `POST /api/admin/collect` | 관리자 수동 수집 시작 |
 

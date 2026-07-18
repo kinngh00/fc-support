@@ -2,7 +2,7 @@ import http from "node:http";
 import { config } from "./config.mjs";
 import { isCollectionRunning, runCollection } from "./collector.mjs";
 import { failAbandonedSnapshots, getActiveSnapshot } from "./database.mjs";
-import { getPickRates, getUserProfile, listAvailablePositions, listRankings, listTeamColors, recentSnapshots, searchRankings, suggestNicknames } from "./queries.mjs";
+import { getPickRates, getUserProfile, listAvailablePositions, listRankings, listTeamColors, portfolioMetrics, recentSnapshots, searchRankings, suggestNicknames } from "./queries.mjs";
 import { startScheduler } from "./scheduler.mjs";
 import { listLogs, logger } from "./logger.mjs";
 import { inspectSnapshotFreshness } from "./freshness.mjs";
@@ -143,6 +143,10 @@ const server = http.createServer(async (request, response) => {
         schedulerEnabled: config.schedulerEnabled,
         configuredApiKeyCount: config.nexonApiKeys.length,
       });
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/portfolio/metrics") {
+      return send(response, 200, portfolioMetrics());
     }
 
     if (request.method === "GET" && url.pathname === "/api/team-colors") {
