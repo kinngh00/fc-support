@@ -447,9 +447,9 @@ function FormationPitch({ details, fallbackFormation }: { details: SquadProfileD
             "--formation-row-count": position.rowCount,
           } as CSSProperties}
         >
-          <div className="formation-player-heading"><b>{player.position || "—"}</b><strong>{player.ovr == null ? "OVR 정보 없음" : `OVR ${player.ovr}`}</strong></div>
+          <div className="formation-player-heading"><b>{player.position || "—"}</b></div>
           <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="formation-player-image" />
-          <b className="formation-player-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
+          <div className="formation-player-name"><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>{player.ovr != null && <strong>{`OVR ${player.ovr}`}</strong>}</div>
           <div className="formation-player-meta"><PlayerMetaBadges player={player} /></div>
           <div className="formation-player-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
         </article>
@@ -532,9 +532,9 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
     <div className="profile-block-heading"><div><span>CURRENT SQUAD</span><h3>현재 선발 스쿼드</h3><small className="squad-adaptation-note">모든 선수는 적응도 5로 표시됩니다.</small></div><div className="squad-heading-tools"><b>{details?.players.length ?? squad.length}명</b><CompactSwitch label="포메이션 배치" checked={formationView} disabled={loading || !details?.players.length} onChange={toggleFormationView} /></div></div>
     {formationView && details ? <FormationPitch details={details} fallbackFormation={formation} /> : detailedSquad.length > 0 ? <div className="squad-grid squad-grid-detailed">{detailedSquad.map((player) => (
       <article className={`position-${positionGroup(player.position)}`} key={`${player.spid}-${player.position}`}>
-        <div className="squad-card-heading"><b>{player.position || "—"}</b>{player.ovr != null && <strong>{`OVR ${player.ovr}`}</strong>}</div>
+        <div className="squad-card-heading"><b>{player.position || "—"}</b></div>
         <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="squad-card-image" />
-        <b className="squad-card-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
+        <div className="squad-card-name"><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>{player.ovr != null && <strong>{`OVR ${player.ovr}`}</strong>}</div>
         <div className="squad-card-meta"><PlayerMetaBadges player={player} /></div>
         <div className="squad-card-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
       </article>
