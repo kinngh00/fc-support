@@ -8,17 +8,59 @@ import { listLogs, logger } from "./logger.mjs";
 import { inspectSnapshotFreshness } from "./freshness.mjs";
 import { listRecentMatches } from "./match-service.mjs";
 import { getSquadProfile } from "./squad-profile-service.mjs";
+import {
+  CommunityError,
+  createComment,
+  createPost,
+  deleteComment,
+  deletePost,
+  getPost,
+  listPosts,
+  loginUser,
+  logoutUser,
+  registerUser,
+  requireUser,
+  sessionCookie,
+  sessionTokenFromRequest,
+  userFromSessionToken,
+} from "./community-service.mjs";
 
-function send(response, status, payload) {
+function send(response, status, payload, headers = {}) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
     "access-control-allow-origin": config.frontendOrigin,
     "access-control-allow-headers": "content-type, authorization",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+    "access-control-allow-credentials": "true",
     vary: "origin",
+    ...headers,
   });
-  response.end(JSON.stringify(payload));
+  response.end(status === 204 ? undefined : JSON.stringify(payload));
+}
+
+async function jsonBody(request) {
+  if (!String(request.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+    throw new CommunityError(415, "JSON_REQUIRED", "JSON 형식으로 요청해 주세요.");
+  }
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > 64 * 1024) throw new CommunityError(413, "PAYLOAD_TOO_LARGE", "요청 내용이 너무 큽니다.");
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+  } catch {
+    throw new CommunityError(400, "INVALID_JSON", "올바른 JSON 형식이 아닙니다.");
+  }
+}
+
+function positiveId(value, name) {
+  const id = Number.parseInt(value, 10);
+  if (!Number.isInteger(id) || id < 1) throw new CommunityError(400, "INVALID_ID", `${name} 번호가 올바르지 않습니다.`);
+  return id;
 }
 
 function integer(url, name, fallback, min, max) {
@@ -35,6 +77,62 @@ const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
   try {
+    const sessionToken = sessionTokenFromRequest(request);
+    const sessionUser = userFromSessionToken(sessionToken);
+
+    if (request.method === "GET" && url.pathname === "/api/auth/me") {
+      return send(response, 200, { user: sessionUser });
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/auth/register") {
+      const result = await registerUser(await jsonBody(request));
+      return send(response, 201, { user: result.user }, { "set-cookie": sessionCookie(result.token) });
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/auth/login") {
+      const result = await loginUser(await jsonBody(request));
+      return send(response, 200, { user: result.user }, { "set-cookie": sessionCookie(result.token) });
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/auth/logout") {
+      logoutUser(sessionToken);
+      return send(response, 200, { ok: true }, { "set-cookie": sessionCookie("", 0) });
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/community/posts") {
+      const offset = integer(url, "offset", 0, 0, 1000000);
+      const limit = integer(url, "limit", 10, 1, 50);
+      return send(response, 200, listPosts({ offset, limit, viewerId: sessionUser?.id || null }));
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/community/posts") {
+      const user = requireUser(sessionToken);
+      return send(response, 201, createPost(user.id, await jsonBody(request)));
+    }
+
+    const postMatch = url.pathname.match(/^\/api\/community\/posts\/(\d+)$/);
+    if (request.method === "GET" && postMatch) {
+      return send(response, 200, getPost(positiveId(postMatch[1], "게시글"), { viewerId: sessionUser?.id || null }));
+    }
+    if (request.method === "DELETE" && postMatch) {
+      const user = requireUser(sessionToken);
+      deletePost(user.id, positiveId(postMatch[1], "게시글"));
+      return send(response, 200, { ok: true });
+    }
+
+    const commentCreateMatch = url.pathname.match(/^\/api\/community\/posts\/(\d+)\/comments$/);
+    if (request.method === "POST" && commentCreateMatch) {
+      const user = requireUser(sessionToken);
+      return send(response, 201, createComment(user.id, positiveId(commentCreateMatch[1], "게시글"), await jsonBody(request)));
+    }
+
+    const commentMatch = url.pathname.match(/^\/api\/community\/comments\/(\d+)$/);
+    if (request.method === "DELETE" && commentMatch) {
+      const user = requireUser(sessionToken);
+      deleteComment(user.id, positiveId(commentMatch[1], "댓글"));
+      return send(response, 200, { ok: true });
+    }
+
     if (request.method === "GET" && url.pathname === "/api/health") {
       const activeSnapshot = getActiveSnapshot();
       return send(response, 200, {
@@ -168,7 +266,9 @@ const server = http.createServer(async (request, response) => {
 
     return send(response, 404, { code: "NOT_FOUND" });
   } catch (error) {
-    return send(response, 400, { code: "BAD_REQUEST", message: String(error?.message || error) });
+    const status = error instanceof CommunityError ? error.status : 400;
+    const code = error instanceof CommunityError ? error.code : "BAD_REQUEST";
+    return send(response, status, { code, message: String(error?.message || error) });
   }
 });
 

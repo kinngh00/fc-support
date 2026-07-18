@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState, type CSSProperties } from "react";
+import { CommunitySection, openCommunityAuthEvent } from "./community";
 
 type PickItem = {
   spid: string;
@@ -1031,7 +1032,7 @@ export default function Home() {
           <a href="#ranking">랭커</a>
           <a href="#community">커뮤니티</a>
         </nav>
-        <button className="login-button" type="button">로그인</button>
+        <button className="login-button" type="button" onClick={() => window.dispatchEvent(new Event(openCommunityAuthEvent))}>로그인</button>
       </header>
 
       <section className="hero" id="top">
@@ -1354,10 +1355,7 @@ export default function Home() {
         </div>
       )}
 
-      <section className="community-section" id="community">
-        <div><p className="section-kicker">FC-SUPPORT COMMUNITY</p><h2>데이터 다음은,<br />당신의 전술.</h2></div>
-        <div className="community-copy"><p>픽률을 확인하고, 스쿼드를 공유하고,<br />감독모드 이야기를 이어가세요.</p><button type="button">커뮤니티 준비 중 <span>→</span></button></div>
-      </section>
+      <CommunitySection />
 
       <footer><a className="brand footer-brand" href="#top"><span className="brand-mark">FC</span><span>SUPPORT</span></a><p>Data based on NEXON Open API</p><small>FC-SUPPORT is not associated with or endorsed by NEXON Korea.</small></footer>
     </main>

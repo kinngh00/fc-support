@@ -135,6 +135,42 @@ export function initializeDatabase() {
       details_json TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS community_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      login_id TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      nickname TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS community_sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS community_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      author_id INTEGER NOT NULL REFERENCES community_users(id),
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      view_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS community_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id INTEGER NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+      author_id INTEGER NOT NULL REFERENCES community_users(id),
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS ranking_entries_filter_idx
       ON ranking_entries(snapshot_id, rank, primary_team_color);
     CREATE INDEX IF NOT EXISTS lineup_players_pick_idx
@@ -145,6 +181,12 @@ export function initializeDatabase() {
       ON ranking_history(ranker_id, data_time);
     CREATE INDEX IF NOT EXISTS backend_logs_created_idx
       ON backend_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS community_sessions_expiry_idx
+      ON community_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS community_posts_created_idx
+      ON community_posts(created_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS community_comments_post_idx
+      ON community_comments(post_id, created_at, id);
   `);
 
   const playerMetadataColumns = new Set(
