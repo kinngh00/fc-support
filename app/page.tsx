@@ -534,7 +534,8 @@ function SquadSection({ nickname, formation, squad, emptyClassName = "profile-em
       <article className={`position-${positionGroup(player.position)}`} key={`${player.spid}-${player.position}`}>
         <div className="squad-card-heading"><b>{player.position || "—"}</b></div>
         <PlayerImage spid={player.spid} name={player.name || "선수"} directImage={player.image} wrapperClassName="squad-card-image" />
-        <div className="squad-card-name"><b title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>{player.ovr != null && <strong>{`OVR ${player.ovr}`}</strong>}</div>
+        <b className="squad-card-name" title={player.name || "선수명 정보 없음"}>{player.name || "선수명 정보 없음"}</b>
+        {player.ovr != null && <strong className="squad-card-ovr">{`OVR ${player.ovr}`}</strong>}
         <div className="squad-card-meta"><PlayerMetaBadges player={player} /></div>
         <div className="squad-card-price"><span>{player.pay == null ? "급여 정보 없음" : `급여 ${player.pay}`}</span><b>{squadPriceLabel(player.price)}</b></div>
       </article>
